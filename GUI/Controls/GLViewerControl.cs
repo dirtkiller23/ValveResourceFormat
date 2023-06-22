@@ -40,7 +40,6 @@ namespace GUI.Controls
         private static bool hasCheckedOpenGL;
 
         long lastFpsUpdate;
-        long lastUpdate;
         int frames;
 
         Vector2 initialMousePosition;
@@ -62,16 +61,13 @@ namespace GUI.Controls
 
             GLControl = new GLControl(new GraphicsMode(32, 24, 0, 8), 3, 3, flags);
             GLControl.Load += OnLoad;
-            GLControl.Paint += OnPaint;
             GLControl.Resize += OnResize;
             GLControl.MouseEnter += OnMouseEnter;
             GLControl.MouseLeave += OnMouseLeave;
             GLControl.MouseUp += OnMouseUp;
             GLControl.MouseDown += OnMouseDown;
             GLControl.MouseWheel += OnMouseWheel;
-            GLControl.GotFocus += OnGotFocus;
             GLControl.VisibleChanged += OnVisibleChanged;
-            GLControl.Disposed += OnDisposed;
 
             GLControl.Dock = DockStyle.Fill;
             glControlContainer.Controls.Add(GLControl);
@@ -173,30 +169,6 @@ namespace GUI.Controls
             currentControlsHeight += control.Height;
         }
 
-        private void OnDisposed(object sender, EventArgs e)
-        {
-            GLControl.Load -= OnLoad;
-            GLControl.Paint -= OnPaint;
-            GLControl.Resize -= OnResize;
-            GLControl.MouseEnter -= OnMouseEnter;
-            GLControl.MouseLeave -= OnMouseLeave;
-            GLControl.MouseUp -= OnMouseUp;
-            GLControl.MouseDown -= OnMouseDown;
-            GLControl.MouseWheel -= OnMouseWheel;
-            GLControl.GotFocus -= OnGotFocus;
-            GLControl.VisibleChanged -= OnVisibleChanged;
-            GLControl.Disposed -= OnDisposed;
-        }
-
-        private void OnVisibleChanged(object sender, EventArgs e)
-        {
-            if (GLControl.Visible)
-            {
-                GLControl.Focus();
-                HandleResize();
-            }
-        }
-
         private void OnMouseLeave(object sender, EventArgs e)
         {
             Camera.MouseOverRenderArea = false;
@@ -271,33 +243,17 @@ namespace GUI.Controls
             HandleResize();
             GLPostLoad?.Invoke(this);
             GLPostLoad = null;
-            Draw();
+
+            RenderLoopThread.RegisterInstance();
+
+            if (GLControl.Visible)
+            {
+                RenderLoopThread.SetCurrentGLControl(this);
+            }
         }
 
-        private void OnPaint(object sender, EventArgs e)
+        public void Draw(long currentTime, long elapsed)
         {
-            Application.DoEvents();
-            Draw();
-        }
-
-        private void Draw()
-        {
-            if (!GLControl.Visible || GLControl.IsDisposed)
-            {
-                return;
-            }
-
-            var currentTime = Stopwatch.GetTimestamp();
-            var elapsed = currentTime - lastUpdate;
-            lastUpdate = currentTime;
-
-            if (elapsed <= TickFrequency)
-            {
-                GLControl.Invalidate();
-
-                return;
-            }
-
             var frameTime = elapsed * TickFrequency / TicksPerSecond;
 
             Camera.HandleInput(Mouse.GetState(), Keyboard.GetState());
@@ -309,7 +265,6 @@ namespace GUI.Controls
             GLPaint?.Invoke(this, new RenderEventArgs { FrameTime = frameTime, Camera = Camera });
 
             GLControl.SwapBuffers();
-            GLControl.Invalidate();
 
             frames++;
 
@@ -323,22 +278,40 @@ namespace GUI.Controls
             }
         }
 
+        private void OnDisposing()
+        {
+            GLControl.Load -= OnLoad;
+            GLControl.Resize -= OnResize;
+            GLControl.MouseEnter -= OnMouseEnter;
+            GLControl.MouseLeave -= OnMouseLeave;
+            GLControl.MouseUp -= OnMouseUp;
+            GLControl.MouseDown -= OnMouseDown;
+            GLControl.MouseWheel -= OnMouseWheel;
+            GLControl.VisibleChanged -= OnVisibleChanged;
+
+            RenderLoopThread.UnsetCurrentGLControl(this);
+            RenderLoopThread.UnregisterInstance();
+        }
+
+        private void OnVisibleChanged(object sender, EventArgs e)
+        {
+            if (GLControl.Visible)
+            {
+                HandleResize();
+
+                RenderLoopThread.SetCurrentGLControl(this);
+            }
+        }
+
         private void OnResize(object sender, EventArgs e)
         {
             HandleResize();
-            Draw();
         }
 
         private void HandleResize()
         {
-            Camera.SetViewportSize(GLControl.Width, GLControl.Height);
-        }
-
-        private void OnGotFocus(object sender, EventArgs e)
-        {
             GLControl.MakeCurrent();
-            HandleResize();
-            Draw();
+            Camera.SetViewportSize(GLControl.Width, GLControl.Height);
         }
 
         private static void CheckOpenGL()

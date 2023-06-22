@@ -13,6 +13,7 @@ using System.Windows.Forms;
 using GUI.Controls;
 using GUI.Forms;
 using GUI.Types.Exporter;
+using GUI.Types.Renderer;
 using GUI.Utils;
 using SteamDatabase.ValvePak;
 
@@ -281,6 +282,8 @@ namespace GUI
 
             //Close the requested tab
             Console.WriteLine($"Closing {tab.Text}");
+
+            RenderLoopThread.UnsetIfClosingParentOfCurrentGLControl(tab);
 
             if (isClosingCurrentTab && tabIndex > 0)
             {
