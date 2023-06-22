@@ -24,6 +24,7 @@ namespace GUI.Utils
             public Dictionary<string, float[]> SavedCameras { get; set; } = new();
             public int MaxTextureSize { get; set; }
             public int FieldOfView { get; set; }
+            public int MaxFPS { get; set; }
             public int WindowTop { get; set; }
             public int WindowLeft { get; set; }
             public int WindowWidth { get; set; }
@@ -110,6 +111,15 @@ namespace GUI.Utils
             else if (Config.FieldOfView >= 120)
             {
                 Config.FieldOfView = 120;
+            }
+
+            if (Config.MaxFPS <= 0)
+            {
+                Config.MaxFPS = 120;
+            }
+            else if (Config.MaxFPS > 500)
+            {
+                Config.MaxFPS = 500;
             }
         }
 
