@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using ValveResourceFormat.ResourceTypes;
@@ -11,6 +12,7 @@ namespace GUI.Types.Renderer
     class SceneAggregate : SceneNode
     {
         public RenderableMesh RenderMesh { get; }
+        public int FragmentCount { get; private set; }
 
         internal sealed class Fragment : SceneNode
         {
@@ -75,6 +77,7 @@ namespace GUI.Types.Renderer
         public IEnumerable<Fragment> CreateFragments(IKeyValueCollection aggregateSceneObject)
         {
             var aggregateMeshes = aggregateSceneObject.GetArray("m_aggregateMeshes");
+            Debug.Assert(FragmentCount == 0);
 
             // Aperture Desk Job goes from draw call -> aggregate mesh
             if (aggregateMeshes.Length > 0 && !aggregateMeshes[0].ContainsKey("m_nDrawCallIndex"))
@@ -93,6 +96,7 @@ namespace GUI.Types.Renderer
                         LightProbeVolumePrecomputedHandshake = lightProbeVolumePrecomputedHandshake,
                     };
 
+                    FragmentCount++;
                     yield return fragment;
                 }
 
@@ -123,6 +127,7 @@ namespace GUI.Types.Renderer
                     fragment.Transform *= fragmentTransforms[transformIndex++].ToMatrix4x4();
                 }
 
+                FragmentCount++;
                 yield return fragment;
             }
         }

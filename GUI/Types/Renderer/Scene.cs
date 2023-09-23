@@ -44,6 +44,7 @@ namespace GUI.Types.Renderer
 
         public bool ShowToolsMaterials { get; set; }
         public bool FogEnabled { get; set; } = true;
+        public bool FastPathEnabled { get; set; }
 
         public IEnumerable<SceneNode> AllNodes => staticNodes.Concat(dynamicNodes);
 
@@ -125,6 +126,7 @@ namespace GUI.Types.Renderer
         // And they are fields here so they only ever grow without having to re-allocate these arrays every frame
         private readonly static List<SceneNode> cullingResult = new();
         private readonly static List<MeshBatchRenderer.Request> renderLooseNodes = new();
+        private readonly static Dictionary<SceneAggregate, MeshBatchRenderer.AggregateRequest> aggregates = new();
         private readonly static List<MeshBatchRenderer.Request> renderOpaqueDrawCalls = new();
         private readonly static List<MeshBatchRenderer.Request> renderStaticOverlays = new();
         private readonly static List<MeshBatchRenderer.Request> renderTranslucentDrawCalls = new();
@@ -133,8 +135,14 @@ namespace GUI.Types.Renderer
         {
             cullFrustum ??= camera.ViewFrustum;
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             StaticOctree.Root.Query(cullFrustum, cullingResult);
             DynamicOctree.Root.Query(cullFrustum, cullingResult);
+            sw.Stop();
+            if (camera.Picker?.IsActive is true)
+            {
+                Console.WriteLine($"Culling took {sw.ElapsedMilliseconds}ms ({TimeSpan.FromTicks(sw.ElapsedTicks).TotalMicroseconds:F2}us) for {cullingResult.Count} nodes ({cullFrustum})");
+            }
 
             // Collect mesh calls
             foreach (var node in cullingResult)
@@ -184,13 +192,29 @@ namespace GUI.Types.Renderer
                 }
                 else if (node is SceneAggregate.Fragment fragment)
                 {
-                    renderOpaqueDrawCalls.Add(new MeshBatchRenderer.Request
+                    var drawCall = new MeshBatchRenderer.Request
                     {
                         Transform = fragment.Transform,
                         Mesh = fragment.RenderMesh,
                         Call = fragment.DrawCall,
                         Node = node,
-                    });
+                    };
+
+                    if (!FastPathEnabled)
+                    {
+                        renderOpaqueDrawCalls.Add(drawCall);
+                        continue;
+                    }
+
+                    var aggregateNode = (SceneAggregate)fragment.Parent;
+
+                    if (!aggregates.TryGetValue(aggregateNode, out var aggregateRequest))
+                    {
+                        aggregateRequest = new MeshBatchRenderer.AggregateRequest(aggregateNode.FragmentCount);
+                        aggregates.Add(aggregateNode, aggregateRequest);
+                    }
+
+                    aggregateRequest.Join(drawCall);
                 }
                 else
                 {
@@ -227,6 +251,23 @@ namespace GUI.Types.Renderer
                 else if (camera.Picker.DebugShader is not null)
                 {
                     renderContext.ReplacementShader = camera.Picker.DebugShader;
+                }
+            }
+
+            if (FastPathEnabled)
+            {
+                renderContext.RenderPass = RenderPass.Opaque_FastPath;
+
+                // CPU Frustum culled draw calls
+                foreach (var aggregatedRequest in aggregates.Values)
+                {
+                    if (aggregatedRequest.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    MeshBatchRenderer.MultiDraw(aggregatedRequest, renderContext);
+                    aggregatedRequest.Clear();
                 }
             }
 

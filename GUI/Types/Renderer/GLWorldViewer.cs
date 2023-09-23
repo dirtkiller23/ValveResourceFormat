@@ -151,6 +151,8 @@ namespace GUI.Types.Renderer
             {
                 var result = new WorldLoader(world, Scene);
 
+                AddCheckBox("Enable aggregate fastpath", Scene.FastPathEnabled, v => Scene.FastPathEnabled = v);
+
                 AddCheckBox("Show Fog", Scene.FogEnabled, (v) =>
                 {
                     Scene.FogEnabled = v;

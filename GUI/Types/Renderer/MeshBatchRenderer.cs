@@ -62,6 +62,88 @@ namespace GUI.Types.Renderer
             DrawBatch(requests, context);
         }
 
+        public class AggregateRequest
+        {
+            public Request First;
+            public int[] IndexCounts;
+            public int[] StartIndices;
+            public int[] BaseVertices;
+            public int Count;
+
+            public AggregateRequest(int capacity)
+            {
+                IndexCounts = new int[capacity];
+                StartIndices = new int[capacity];
+                BaseVertices = new int[capacity];
+            }
+
+            public void Join(Request request)
+            {
+                IndexCounts[Count] = request.Call.IndexCount;
+                StartIndices[Count] = (int)request.Call.StartIndex;
+                BaseVertices[Count] = (int)request.Call.BaseVertex;
+
+                if (Count++ == 0)
+                {
+                    First = request;
+                }
+            }
+
+            public void Clear()
+            {
+                Count = 0;
+            }
+        }
+
+        public static void MultiDraw(AggregateRequest request, Scene.RenderContext context)
+        {
+            // Assuming all fragments have the same material, shader & vao.
+
+            var vao = request.First.Call.VertexArrayObject;
+            var material = request.First.Call.Material;
+            var shader = material.Shader;
+
+            GL.BindVertexArray(vao);
+            GL.UseProgram(shader.Program);
+            material.Render();
+
+            foreach (var buffer in context.Buffers)
+            {
+                buffer.SetBlockBinding(shader);
+            }
+
+            context.LightingInfo.SetLightmapTextures(shader);
+            context.FogInfo.SetCubemapFogTexture(shader);
+
+            var instanceBuffer = new Uniforms
+            {
+                Animated = shader.GetUniformLocation("bAnimated"),
+                AnimationTexture = shader.GetUniformLocation("animationTexture"),
+                NumBones = shader.GetUniformLocation("fNumBones"),
+                Transform = shader.GetUniformLocation("transform"),
+                Tint = shader.GetUniformLocation("m_vTintColorSceneObject"),
+                TintDrawCall = shader.GetUniformLocation("m_vTintColorDrawCall"),
+                CubeMapArrayIndices = shader.GetUniformLocation("g_iEnvMapArrayIndices"),
+                ObjectId = shader.GetUniformLocation("sceneObjectId"),
+                MeshId = shader.GetUniformLocation("meshId"),
+                ShaderId = shader.GetUniformLocation("shaderId"),
+                ShaderProgramId = shader.GetUniformLocation("shaderProgramId")
+            };
+
+            SetInstanceData(ref instanceBuffer, request.First);
+
+            GL.MultiDrawElementsBaseVertex(
+                request.First.Call.PrimitiveType,
+                request.IndexCounts,
+                request.First.Call.IndexType,
+                request.StartIndices,
+                request.Count,
+                request.BaseVertices
+            );
+
+            material.PostRender();
+        }
+
         private ref struct Uniforms
         {
             public int Animated;
@@ -137,14 +219,21 @@ namespace GUI.Types.Renderer
                     material.Render(shader);
                 }
 
-                Draw(ref uniforms, request);
+                SetInstanceData(ref uniforms, request);
+
+                GL.DrawElementsBaseVertex(
+                    request.Call.PrimitiveType,
+                    request.Call.IndexCount,
+                    request.Call.IndexType,
+                    (IntPtr)request.Call.StartIndex,
+                    (int)request.Call.BaseVertex);
             }
 
             material?.PostRender();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void Draw(ref Uniforms uniforms, Request request)
+        private static void SetInstanceData(ref Uniforms uniforms, Request request)
         {
             var transformTk = request.Transform.ToOpenTK();
             GL.UniformMatrix4(uniforms.Transform, false, ref transformTk);
@@ -208,14 +297,6 @@ namespace GUI.Types.Renderer
             {
                 GL.Uniform3(uniforms.TintDrawCall, request.Call.TintColor);
             }
-
-            GL.DrawElementsBaseVertex(
-                request.Call.PrimitiveType,
-                request.Call.IndexCount,
-                request.Call.IndexType,
-                (IntPtr)request.Call.StartIndex,
-                (int)request.Call.BaseVertex
-            );
         }
     }
 }
