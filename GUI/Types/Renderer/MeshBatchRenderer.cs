@@ -66,21 +66,21 @@ namespace GUI.Types.Renderer
         {
             public Request First;
             public int[] IndexCounts;
-            public int[] StartIndices;
+            public IntPtr[] StartIndices;
             public int[] BaseVertices;
             public int Count;
 
             public AggregateRequest(int capacity)
             {
                 IndexCounts = new int[capacity];
-                StartIndices = new int[capacity];
+                StartIndices = new IntPtr[capacity];
                 BaseVertices = new int[capacity];
             }
 
             public void Join(Request request)
             {
                 IndexCounts[Count] = request.Call.IndexCount;
-                StartIndices[Count] = (int)request.Call.StartIndex;
+                StartIndices[Count] = (IntPtr)request.Call.StartIndex;
                 BaseVertices[Count] = (int)request.Call.BaseVertex;
 
                 if (Count++ == 0)
@@ -134,11 +134,11 @@ namespace GUI.Types.Renderer
 
             GL.MultiDrawElementsBaseVertex(
                 request.First.Call.PrimitiveType,
-                request.IndexCounts,
+                request.IndexCounts[0..request.Count],
                 request.First.Call.IndexType,
-                request.StartIndices,
+                request.StartIndices[0..request.Count],
                 request.Count,
-                request.BaseVertices
+                request.BaseVertices[0..request.Count]
             );
 
             material.PostRender();
@@ -225,7 +225,7 @@ namespace GUI.Types.Renderer
                     request.Call.PrimitiveType,
                     request.Call.IndexCount,
                     request.Call.IndexType,
-                    (IntPtr)request.Call.StartIndex,
+                    (int)request.Call.StartIndex,
                     (int)request.Call.BaseVertex);
             }
 
