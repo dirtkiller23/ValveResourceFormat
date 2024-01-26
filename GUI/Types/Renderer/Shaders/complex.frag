@@ -255,7 +255,8 @@ uniform sampler2D g_tTintMask;
 #include "common/pbr.glsl"
 #include "common/fog.glsl"
 
-#include "common/environment.glsl" // (S_SPECULAR == 1 || renderMode_Cubemaps == 1)
+flat in uvec2 nEnvMap_LpvIndex;
+#include "common/environment.glsl"
 
 // Must be last
 #include "common/lighting.glsl"

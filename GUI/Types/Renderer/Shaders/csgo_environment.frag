@@ -27,7 +27,7 @@ in vec3 vTangentOut;
 in vec3 vBitangentOut;
 in vec4 vTexCoord;
 in vec4 vTexCoord2;
-in vec4 vTintColor_ModelAmount;
+flat in vec4 vTintColor_ModelAmount;
 centroid in vec4 vVertexColor_Alpha;
 in vec4 vBlendColorTint;
 
@@ -155,7 +155,9 @@ uniform float g_flModelTintAmount = 1.0;
 #include "common/fullbright.glsl"
 #include "common/texturing.glsl"
 #include "common/pbr.glsl"
-#include "common/environment.glsl" // (S_SPECULAR == 1 || renderMode_Cubemaps == 1)
+
+flat in uvec2 nEnvMap_LpvIndex;
+#include "common/environment.glsl"
 
 #include "common/fog.glsl"
 

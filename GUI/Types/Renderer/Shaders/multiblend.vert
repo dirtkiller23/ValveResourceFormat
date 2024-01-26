@@ -8,9 +8,9 @@
 layout (location = 0) in vec3 vPOSITION;
 #include "common/compression.glsl"
 layout (location = 3) in vec2 vTEXCOORD;
-layout (location = 4) in vec4 vTEXCOORD1;
-layout (location = 5) in vec4 vTEXCOORD2;
-layout (location = 6) in vec4 vTEXCOORD3;
+in vec4 vTEXCOORD1;
+in vec4 vTEXCOORD2;
+in vec4 vTEXCOORD3;
 
 out vec3 vFragPosition;
 
@@ -29,9 +29,8 @@ out vec2 vTexCoord2Out;
 out vec2 vTexCoord3Out;
 #endif
 
+#include "common/instancing.glsl"
 #include "common/ViewConstants.glsl"
-uniform mat4 transform;
-uniform vec4 vTint = vec4(1.0);
 
 uniform float g_flTexCoordScale0 = 1.0;
 uniform float g_flTexCoordScale1 = 1.0;
@@ -76,7 +75,9 @@ vec2 getTexCoord(float scale, float rotation, vec4 offset, vec4 scroll) {
 
 void main()
 {
-    mat4 skinTransform = transform * getSkinMatrix();
+    InstanceData_t instance = DecodePackedInstanceData(GetInstanceData());
+
+    mat4 skinTransform = CalculateObjectToWorldMatrix(instance.nTransformBufferOffset) * getSkinMatrix();
     vec4 fragPosition = skinTransform * vec4(vPOSITION, 1.0);
     gl_Position = g_matViewToProjection * fragPosition;
     vFragPosition = fragPosition.xyz / fragPosition.w;
@@ -105,6 +106,6 @@ void main()
     vBlendAlphas.xyz = vTEXCOORD2.xyz;//max(vTEXCOORD1.xyz * 0.5, 1e-6);
     vBlendAlphas.w = 0.0;
 
-    vVertexColor.rgb = SrgbGammaToLinear(vTint.rgb) * SrgbGammaToLinear(vTEXCOORD3.rgb);
-    vVertexColor.a = vTint.a;
+    vVertexColor.rgb = SrgbGammaToLinear(instance.vTint.rgb) * SrgbGammaToLinear(vTEXCOORD3.rgb);
+    vVertexColor.a = instance.vTint.a;
 }

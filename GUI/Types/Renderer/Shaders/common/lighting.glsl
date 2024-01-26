@@ -29,59 +29,60 @@
         uniform sampler3D g_tLPV_Shadows;
     #endif
 
-    layout(std140, binding = 2) uniform LightProbeVolume
+    struct LightProbe
     {
-        uniform mat4 g_matLightProbeVolumeWorldToLocal;
-        #if (SCENE_PROBE_TYPE == 1)
-            vec4 g_vLightProbeVolumeLayer0TextureMin;
-            vec4 g_vLightProbeVolumeLayer0TextureMax;
-        #elif (SCENE_PROBE_TYPE == 2)
-            vec4 g_vLightProbeVolumeBorderMin;
-            vec4 g_vLightProbeVolumeBorderMax;
-            vec4 g_vLightProbeVolumeAtlasScale;
-            vec4 g_vLightProbeVolumeAtlasOffset;
+        vec3 Position;
+        vec3 Min; vec3 Max;
+        #if (SCENE_PROBE_TYPE == 2)
+            vec3 AtlasOffset; vec3 AtlasScale;
         #endif
     };
 
-    vec3 CalculateProbeSampleCoords(vec3 fragPosition)
+    LightProbe GetProbe(vec3 fragPosition)
     {
-        vec3 vLightProbeLocalPos = mat4x3(g_matLightProbeVolumeWorldToLocal) * vec4(fragPosition, 1.0);
-        return vLightProbeLocalPos;
+        LightProbeVolumeData data = g_vLightProbeVolumeData[nEnvMap_LpvIndex.y];
+
+        LightProbe probe;
+        probe.Position = mat4x3(data.WorldToLocalNormalizer) * vec4(fragPosition, 1.0);
+        probe.Min = data.Min.xyz;
+        probe.Max = data.Max.xyz;
+
+        #if (SCENE_PROBE_TYPE == 2)
+            probe.AtlasOffset = data.AtlasOffset.xyz;
+            probe.AtlasScale = data.AtlasScale.xyz;
+        #endif
+
+        return probe;
     }
 
     vec3 CalculateProbeShadowCoords(vec3 fragPosition)
     {
-        vec3 vLightProbeLocalPos = CalculateProbeSampleCoords(fragPosition);
+        LightProbe probe = GetProbe(fragPosition);
 
-        #if (SCENE_PROBE_TYPE == 2)
-            vLightProbeLocalPos = fma(saturate(vLightProbeLocalPos), g_vLightProbeVolumeAtlasScale.xyz, g_vLightProbeVolumeAtlasOffset.xyz);
+        #if (SCENE_PROBE_TYPE == 1)
+            return probe.Position;
+        #elif (SCENE_PROBE_TYPE == 2)
+            return fma(saturate(probe.Position), probe.AtlasScale, probe.AtlasOffset);
         #endif
-
-        return vLightProbeLocalPos;
     }
 
     vec3 CalculateProbeIndirectCoords(vec3 fragPosition)
     {
-        vec3 indirectCoords = CalculateProbeSampleCoords(fragPosition);
+        LightProbe probe = GetProbe(fragPosition);
 
         #if (SCENE_PROBE_TYPE == 1)
-            indirectCoords.z /= 6;
+            probe.Position.z /= 6;
             // clamp(indirectCoords, g_vLightProbeVolumeLayer0TextureMin.xyz, g_vLightProbeVolumeLayer0TextureMax.xyz);
         #elif (SCENE_PROBE_TYPE == 2)
-            indirectCoords.z /= 6;
-            indirectCoords = clamp(indirectCoords, g_vLightProbeVolumeBorderMin.xyz, g_vLightProbeVolumeBorderMax.xyz);
-
-            indirectCoords.z *= 6;
-            indirectCoords = fma(indirectCoords, g_vLightProbeVolumeAtlasScale.xyz, g_vLightProbeVolumeAtlasOffset.xyz);
-
-            indirectCoords.z /= 6;
+            probe.Position.z /= 6;
+            probe.Position = clamp(probe.Position, probe.Min, probe.Max);
+            probe.Position.z *= 6;
+            probe.Position = fma(probe.Position, probe.AtlasScale, probe.AtlasOffset);
+            probe.Position.z /= 6;
         #endif
 
-        return indirectCoords;
+        return probe.Position;
     }
-#elif (D_BAKED_LIGHTING_FROM_VERTEX_STREAM == 1)
-    in vec3 vPerVertexLightingOut;
-#endif
 
 uniform sampler2DShadow g_tShadowDepthBufferDepth;
 
@@ -109,6 +110,10 @@ float CalculateSunShadowMapVisibility(vec3 vPosition)
             shadow += pcfDepth;
         }
     }
+            return probe.Position;
+        #endif
+    }
+#endif
 
     shadow /= 9.0;
     return 1 - shadow;

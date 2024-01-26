@@ -42,6 +42,7 @@ namespace GUI.Types.Renderer
         private OctreeDebugRenderer<SceneNode> staticOctreeRenderer;
         private OctreeDebugRenderer<SceneNode> dynamicOctreeRenderer;
         protected SelectedNodeRenderer selectedNodeRenderer;
+        private Shader depthOnlyShader;
 
         public enum DepthOnlyProgram
         {
@@ -109,9 +110,9 @@ namespace GUI.Types.Renderer
         {
             if (disposing)
             {
-                viewBuffer?.Dispose();
                 Scene?.Dispose();
                 SkyboxScene?.Dispose();
+                viewBuffer?.Dispose();
 
                 GLPaint -= OnPaint;
 
@@ -142,10 +143,10 @@ namespace GUI.Types.Renderer
             viewBuffer = new(ReservedBufferSlots.View);
         }
 
-        void UpdatePerViewGpuBuffers(Scene scene, Camera camera)
+        void UpdatePerViewGpuBuffer(Scene scene, Camera camera)
         {
             camera.SetViewConstants(viewBuffer.Data);
-            scene.SetFogConstants(viewBuffer.Data);
+            //scene.SetFogConstants(viewBuffer.Data);
             viewBuffer.Update();
         }
 
@@ -197,6 +198,12 @@ namespace GUI.Types.Renderer
                 Textures.Add(new(ReservedTextureSlots.FogCubeTexture, "g_tFogCubeTexture", Scene.FogInfo.CubemapFog.CubemapFogTexture));
             }
 
+            if (Scene.FogInfo.CubeFogActive)
+            {
+                Textures.RemoveAll(t => t.Slot == ReservedTextureSlots.FogCubeTexture);
+                Textures.Add(new(ReservedTextureSlots.FogCubeTexture, "g_tFogCubeTexture", Scene.FogInfo.CubemapFog.CubemapFogTexture));
+            }
+
             if (Scene.AllNodes.Any() && this is not GLWorldViewer)
             {
                 var first = true;
@@ -240,6 +247,7 @@ namespace GUI.Types.Renderer
             selectedNodeRenderer = new(Scene, textRenderer);
 
             Picker = new PickingTexture(Scene.GuiContext, OnPicked);
+            depthOnlyShader = GuiContext.ShaderLoader.LoadShader("vrf.depth_only");
 
             var shadowQuality = this switch
             {
@@ -291,6 +299,8 @@ namespace GUI.Types.Renderer
                 View = this,
                 Camera = Camera,
                 Framebuffer = MainFramebuffer,
+                Flags = Scene.RenderPassFlags.All,
+                ReplacementShader = Picker.DebugShader ?? null
             };
 
             using (new GLDebugGroup("Update Loop"))
@@ -303,6 +313,8 @@ namespace GUI.Types.Renderer
                 Scene.SetupSceneShadows(Camera);
                 Scene.CollectSceneDrawCalls(Camera, lockedCullFrustum);
                 SkyboxScene?.CollectSceneDrawCalls(Camera, lockedCullFrustum);
+
+                UpdatePerViewGpuBuffer(Scene, Camera);
             }
 
             using (new GLDebugGroup("Scenes Render"))
@@ -386,21 +398,40 @@ namespace GUI.Types.Renderer
             GL.Viewport(0, 0, renderContext.Framebuffer.Width, renderContext.Framebuffer.Height);
             renderContext.Framebuffer.Clear();
 
-            // TODO: check if renderpass allows wireframe mode
-            if (IsWireframe)
+            GL.DepthRange(0.05, 1);
+            UpdatePerViewGpuBuffers(Scene, Camera);
+
+            var RenderDepthPrepass = Scene.DepthPassEnabled && (renderContext.Flags & Scene.RenderPassFlags.DepthPassAllowed) != 0;
+            if (RenderDepthPrepass)
+            {
+                using (new GLDebugGroup("Depth Prepass Render"))
+                {
+                    GL.ColorMask(false, false, false, false);
+                    GL.DepthMask(true);
+
+                    var oldReplacementShader = renderContext.ReplacementShader;
+                    renderContext.ReplacementShader = depthOnlyShader;
+
+                    renderContext.Scene = Scene;
+                    Scene.DepthPassOpaque(renderContext);
+
+                    renderContext.ReplacementShader = oldReplacementShader;
+                    GL.ColorMask(true, true, true, true);
+                }
+            }
+
+            var RenderWireframe = IsWireframe && (renderContext.Flags & Scene.RenderPassFlags.WireframeAllowed) != 0;
+            if (RenderWireframe)
             {
                 GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
             }
 
-            GL.DepthRange(0.05, 1);
-
-            UpdatePerViewGpuBuffers(Scene, Camera);
             Scene.SetSceneBuffers();
 
             using (new GLDebugGroup("Main Scene Opaque Render"))
             {
                 renderContext.Scene = Scene;
-                Scene.RenderOpaqueLayer(renderContext);
+                Scene.RenderOpaqueLayer(renderContext, RenderDepthPrepass);
             }
 
             using (new GLDebugGroup("Sky Render"))
@@ -445,7 +476,7 @@ namespace GUI.Types.Renderer
                 RenderTranslucentLayer(Scene, renderContext);
             }
 
-            if (IsWireframe)
+            if (RenderWireframe)
             {
                 GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
             }
@@ -477,6 +508,7 @@ namespace GUI.Types.Renderer
         protected void AddWireframeToggleControl()
         {
             AddCheckBox("Show Wireframe", false, (v) => IsWireframe = v);
+            AddCheckBox("Enable Depth Pass", Scene.DepthPassEnabled, (v) => Scene.DepthPassEnabled = v);
         }
 
         protected void AddRenderModeSelectionControl()

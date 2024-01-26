@@ -34,6 +34,7 @@ namespace GUI.Types.Renderer
         public bool IsOverlay { get; }
         public bool IsAlphaTest { get; }
         public bool IsToolsMaterial { get; }
+        public bool NoZPrepass { get; }
 
         private readonly bool isAdditiveBlend;
         private readonly bool isMod2x;
@@ -104,7 +105,9 @@ namespace GUI.Types.Renderer
                 || material.ShaderName == "csgo_effects.vfx"
                 || material.ShaderName == "csgo_decalmodulate.vfx"
                 || material.ShaderName == "tools_sprite.vfx";
+
             IsAlphaTest = material.IntParams.GetValueOrDefault("F_ALPHA_TEST") == 1;
+            NoZPrepass = material.IntParams.GetValueOrDefault("F_NO_Z_PREPASS") == 1;
             isAdditiveBlend = material.IntParams.GetValueOrDefault("F_ADDITIVE_BLEND") == 1;
             isRenderBackfaces = material.IntParams.GetValueOrDefault("F_RENDER_BACKFACES") == 1;
             hasDepthBias = material.IntParams.GetValueOrDefault("F_DEPTHBIAS") == 1 || material.IntParams.GetValueOrDefault("F_DEPTH_BIAS") == 1;

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using GUI.Utils;
 using OpenTK.Graphics.OpenGL;
 
@@ -10,7 +11,6 @@ namespace GUI.Types.Renderer
         [DebuggerDisplay("{Node.DebugName,nq}")]
         public struct Request
         {
-            public Matrix4x4 Transform;
             public RenderableMesh Mesh;
             public DrawCall Call;
             public float DistanceFromCamera;
@@ -38,47 +38,55 @@ namespace GUI.Types.Renderer
             return a.RenderOrder - b.RenderOrder;
         }
 
-        public static int CompareCameraDistance(Request a, Request b)
+        public static int CompareCameraDistance_BackToFront(Request a, Request b)
         {
             return -a.DistanceFromCamera.CompareTo(b.DistanceFromCamera);
         }
 
-        public static void Render(List<Request> requests, Scene.RenderContext context)
+        public static int CompareCameraDistance_FrontToBack(Request a, Request b)
         {
-            if (context.RenderPass == RenderPass.Opaque)
+            return a.DistanceFromCamera.CompareTo(b.DistanceFromCamera);
+        }
+
+        public static int CompareVaoThenDistance(Request a, Request b)
+        {
+            var vaoCompare = a.Call.VertexArrayObject.CompareTo(b.Call.VertexArrayObject);
+            if (vaoCompare == 0)
             {
-                requests.Sort(ComparePipeline);
+                return CompareCameraDistance_FrontToBack(a, b);
             }
-            else if (context.RenderPass == RenderPass.StaticOverlay)
-            {
-                requests.Sort(CompareRenderOrderThenPipeline);
-            }
-            else if (context.RenderPass == RenderPass.Translucent)
-            {
-                requests.Sort(CompareCameraDistance);
-            }
+
+            return vaoCompare;
+        }
+
+        public static int CompareAABBSize(Request a, Request b)
+        {
+            var aSize = MathF.Max(a.Node.BoundingBox.Size.X, MathF.Max(a.Node.BoundingBox.Size.Y, a.Node.BoundingBox.Size.Z));
+            var bSize = MathF.Max(b.Node.BoundingBox.Size.X, MathF.Max(b.Node.BoundingBox.Size.Y, b.Node.BoundingBox.Size.Z));
+            return aSize.CompareTo(bSize);
+        }
+
+        public static void Render(List<Request> requestsList, Scene.RenderContext context)
+        {
+            var requests = CollectionsMarshal.AsSpan(requestsList);
 
             DrawBatch(requests, context);
         }
 
         private ref struct Uniforms
         {
+            public bool UseLightProbeLighting;
             public int Animated = -1;
             public int AnimationTexture = -1;
             public int EnvmapTexture = -1;
-            public int LightProbeVolumeData = -1;
             public int LPVIrradianceTexture = -1;
             public int LPVIndicesTexture = -1;
             public int LPVScalarsTexture = -1;
             public int LPVShadowsTexture = -1;
-            public int Transform = -1;
-            public int Tint = -1;
             public int ObjectId = -1;
             public int MeshId = -1;
             public int ShaderId = -1;
             public int ShaderProgramId = -1;
-            public int CubeMapArrayIndices = -1;
-            public int CubeMapArrayLength = -1;
             public int MorphCompositeTexture = -1;
             public int MorphCompositeTextureSize = -1;
             public int MorphVertexIdOffset = -1;
@@ -110,7 +118,7 @@ namespace GUI.Types.Renderer
             }
         }
 
-        private static void DrawBatch(List<Request> requests, Scene.RenderContext context)
+        public static void DrawBatch(ReadOnlySpan<Request> requests, Scene.RenderContext context)
         {
             var vao = -1;
             Shader shader = null;
@@ -147,16 +155,11 @@ namespace GUI.Types.Renderer
                         {
                             Animated = shader.GetUniformLocation("bAnimated"),
                             AnimationTexture = shader.GetUniformLocation("animationTexture"),
-                            Transform = shader.GetUniformLocation("transform"),
-                            Tint = shader.GetUniformLocation("vTint"),
                         };
 
                         if (shader.Parameters.ContainsKey("SCENE_CUBEMAP_TYPE"))
                         {
                             uniforms.EnvmapTexture = shader.GetUniformLocation("g_tEnvironmentMap");
-                            uniforms.CubeMapArrayIndices = shader.GetUniformLocation("g_iEnvMapArrayIndices");
-                            uniforms.CubeMapArrayLength = shader.GetUniformLocation("g_iEnvMapArrayLength");
-
                         }
 
                         if (shader.Parameters.ContainsKey("F_MORPH_SUPPORTED"))
@@ -168,7 +171,7 @@ namespace GUI.Types.Renderer
 
                         if (shader.Parameters.ContainsKey("D_BAKED_LIGHTING_FROM_PROBE"))
                         {
-                            uniforms.LightProbeVolumeData = shader.GetUniformBlockIndex("LightProbeVolume");
+                            uniforms.UseLightProbeLighting = true;
                             uniforms.LPVIrradianceTexture = shader.GetUniformLocation("g_tLPV_Irradiance");
                             uniforms.LPVIndicesTexture = shader.GetUniformLocation("g_tLPV_Indices");
                             uniforms.LPVScalarsTexture = shader.GetUniformLocation("g_tLPV_Scalars");
@@ -211,9 +214,6 @@ namespace GUI.Types.Renderer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Draw(Shader shader, ref Uniforms uniforms, ref Config config, Request request)
         {
-            var transformTk = request.Transform.ToOpenTK();
-            GL.ProgramUniformMatrix4(shader.Program, uniforms.Transform, false, ref transformTk);
-
             if (uniforms.ObjectId != -1)
             {
                 GL.ProgramUniform1((uint)shader.Program, uniforms.ObjectId, request.Node.Id);
@@ -222,40 +222,25 @@ namespace GUI.Types.Renderer
                 GL.ProgramUniform1((uint)shader.Program, uniforms.ShaderProgramId, (uint)request.Call.Material.Shader.Program);
             }
 
-            if (uniforms.CubeMapArrayIndices != -1 && request.Node.EnvMapIds != null)
+            if (config.NeedsCubemapBinding && request.Node.EnvMap != null)
             {
-                if (config.NeedsCubemapBinding && request.Node.EnvMaps.Count > 0)
-                {
-                    var envmap = request.Node.EnvMaps[0].EnvMapTexture;
-                    var envmapDataIndex = request.Node.EnvMapIds[0];
-
-                    SetInstanceTexture(shader, ReservedTextureSlots.EnvironmentMap, uniforms.EnvmapTexture, envmap);
-                    GL.ProgramUniform1(shader.Program, uniforms.CubeMapArrayIndices, envmapDataIndex);
-                }
-                else
-                {
-                    GL.ProgramUniform1(shader.Program, uniforms.CubeMapArrayLength, request.Node.EnvMapIds.Length);
-                    GL.ProgramUniform1(shader.Program, uniforms.CubeMapArrayIndices, request.Node.EnvMapIds.Length, request.Node.EnvMapIds);
-                }
+                var envmap = request.Node.EnvMap.EnvMapTexture;
+                SetInstanceTexture(shader, ReservedTextureSlots.EnvironmentMap, uniforms.EnvmapTexture, envmap);
             }
 
-            if (uniforms.LightProbeVolumeData != -1 && request.Node.LightProbeBinding is { } lightProbe)
+            if (config.LightProbeType != Scene.LightProbeType.ProbeAtlas && uniforms.UseLightProbeLighting
+                && request.Node.LightProbeBinding is { } lightProbe)
             {
-                lightProbe.SetGpuProbeData(config.LightProbeType == Scene.LightProbeType.ProbeAtlas);
+                SetInstanceTexture(shader, ReservedTextureSlots.Probe1, uniforms.LPVIrradianceTexture, lightProbe.Irradiance);
 
-                if (config.LightProbeType == Scene.LightProbeType.IndividualProbes)
+                if (config.LightmapGameVersionNumber == 1)
                 {
-                    SetInstanceTexture(shader, ReservedTextureSlots.Probe1, uniforms.LPVIrradianceTexture, lightProbe.Irradiance);
-
-                    if (config.LightmapGameVersionNumber == 1)
-                    {
-                        SetInstanceTexture(shader, ReservedTextureSlots.Probe2, uniforms.LPVIndicesTexture, lightProbe.DirectLightIndices);
-                        SetInstanceTexture(shader, ReservedTextureSlots.Probe3, uniforms.LPVScalarsTexture, lightProbe.DirectLightScalars);
-                    }
-                    else if (request.Node.Scene.LightingInfo.LightmapGameVersionNumber == 2)
-                    {
-                        SetInstanceTexture(shader, ReservedTextureSlots.Probe2, uniforms.LPVShadowsTexture, lightProbe.DirectLightShadows);
-                    }
+                    SetInstanceTexture(shader, ReservedTextureSlots.Probe2, uniforms.LPVIndicesTexture, lightProbe.DirectLightIndices);
+                    SetInstanceTexture(shader, ReservedTextureSlots.Probe3, uniforms.LPVScalarsTexture, lightProbe.DirectLightScalars);
+                }
+                else if (request.Node.Scene.LightingInfo.LightmapGameVersionNumber == 2)
+                {
+                    SetInstanceTexture(shader, ReservedTextureSlots.Probe2, uniforms.LPVShadowsTexture, lightProbe.DirectLightShadows);
                 }
             }
 
@@ -282,13 +267,7 @@ namespace GUI.Types.Renderer
                 GL.ProgramUniform1(shader.Program, uniforms.MorphVertexIdOffset, morphComposite != null ? request.Call.VertexIdOffset : -1);
             }
 
-            if (uniforms.Tint > -1)
-            {
-                var instanceTint = (request.Node is SceneAggregate.Fragment fragment) ? fragment.Tint : Vector4.One;
-                var tint = request.Mesh.Tint * request.Call.TintColor * instanceTint;
-
-                GL.ProgramUniform4(shader.Program, uniforms.Tint, tint.X, tint.Y, tint.Z, tint.W);
-            }
+            GL.VertexAttrib1(/*uniforms.ObjectId*/ 5, BitConverter.UInt32BitsToSingle(request.Node.Id));
 
             GL.DrawElementsBaseVertex(
                 request.Call.PrimitiveType,

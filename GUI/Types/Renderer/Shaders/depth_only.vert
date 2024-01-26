@@ -18,7 +18,7 @@ uniform mat4 transform;
 
 void main()
 {
-    mat4 vertexTransform = transform;
+    mat4 vertexTransform = CalculateObjectToWorldMatrix();
     vec3 vertexPosition = vPOSITION;
 
     #if (D_ANIMATED == 1)

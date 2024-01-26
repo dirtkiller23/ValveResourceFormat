@@ -28,6 +28,7 @@ in vec3 vTangentOut;
 in vec3 vBitangentOut;
 
 in vec2 vTexCoordOut;
+flat in vec3 vTint;
 
 out vec4 outputColor;
 
@@ -37,7 +38,6 @@ uniform sampler2D g_tNormal;
 uniform sampler2D g_tMasks1;
 uniform sampler2D g_tMasks2;
 //uniform sampler2D g_tDiffuseWarp;
-uniform vec4 vTint;
 
 #include "common/utils.glsl"
 #include "common/ViewConstants.glsl"
