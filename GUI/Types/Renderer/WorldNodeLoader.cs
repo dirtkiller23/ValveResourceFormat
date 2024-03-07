@@ -41,6 +41,12 @@ namespace GUI.Types.Renderer
                 foreach (var refMesh in meshNamesForLod1)
                 {
                     var newResource = guiContext.LoadFileCompiled(refMesh.MeshName);
+
+                    if (newResource != null)
+                    {
+                        var mesh = (Mesh)newResource.DataBlock;
+                        var vbib = mesh.VBIB; // Access vbib to force decode
+                    }
                 }
             }
         }
