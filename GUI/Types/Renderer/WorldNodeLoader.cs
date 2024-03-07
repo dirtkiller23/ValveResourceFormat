@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using GUI.Utils;
+using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization;
 
@@ -30,6 +33,38 @@ namespace GUI.Types.Renderer
             var i = 0;
             var defaultLightingOrigin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             // Output is WorldNode_t we need to iterate m_sceneObjects inside it
+
+            var resources = new ConcurrentDictionary<string, Resource>(
+                concurrencyLevel: Environment.ProcessorCount,
+                capacity: Math.Max(node.AggregateSceneObjects.Count, node.SceneObjects.Count)
+            );
+
+            Parallel.ForEach(node.SceneObjects, (sceneObject) =>
+            {
+                var renderableModel = sceneObject.GetProperty<string>("m_renderableModel");
+                var renderable = sceneObject.GetProperty<string>("m_renderable");
+
+                if (renderableModel != null)
+                {
+                    var newResource = guiContext.LoadFileCompiled(renderableModel);
+
+                    if (newResource != null)
+                    {
+                        resources.TryAdd(renderableModel, newResource);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(renderable))
+                {
+                    var newResource = guiContext.LoadFileCompiled(renderable);
+
+                    if (newResource != null)
+                    {
+                        resources.TryAdd(renderable, newResource);
+                    }
+                }
+            });
+
             foreach (var sceneObject in node.SceneObjects)
             {
                 var layerIndex = (int)(node.SceneObjectLayerIndices?[i++] ?? -1);
@@ -51,15 +86,8 @@ namespace GUI.Types.Renderer
                     tintColor = Vector4.One;
                 }
 
-                if (renderableModel != null)
+                if (renderableModel != null && resources.TryGetValue(renderableModel, out var newResource))
                 {
-                    var newResource = guiContext.LoadFileCompiled(renderableModel);
-
-                    if (newResource == null)
-                    {
-                        continue;
-                    }
-
                     var modelNode = new ModelSceneNode(scene, (Model)newResource.DataBlock, null, optimizeForMapLoad: true)
                     {
                         Transform = matrix,
@@ -77,15 +105,8 @@ namespace GUI.Types.Renderer
 
                 var renderable = sceneObject.GetProperty<string>("m_renderable");
 
-                if (!string.IsNullOrEmpty(renderable))
+                if (!string.IsNullOrEmpty(renderable) && resources.TryGetValue(renderable, out newResource))
                 {
-                    var newResource = guiContext.LoadFileCompiled(renderable);
-
-                    if (newResource == null)
-                    {
-                        continue;
-                    }
-
                     var meshNode = new MeshSceneNode(scene, (Mesh)newResource.DataBlock, 0)
                     {
                         Transform = matrix,
@@ -100,18 +121,29 @@ namespace GUI.Types.Renderer
                 }
             }
 
-            foreach (var sceneObject in node.AggregateSceneObjects)
+            resources.Clear();
+
+            Parallel.ForEach(node.AggregateSceneObjects, (sceneObject) =>
             {
                 var renderableModel = sceneObject.GetProperty<string>("m_renderableModel");
 
                 if (renderableModel != null)
                 {
                     var newResource = guiContext.LoadFileCompiled(renderableModel);
-                    if (newResource == null)
-                    {
-                        continue;
-                    }
 
+                    if (newResource != null)
+                    {
+                        resources.TryAdd(renderableModel, newResource);
+                    }
+                }
+            });
+
+            foreach (var sceneObject in node.AggregateSceneObjects)
+            {
+                var renderableModel = sceneObject.GetProperty<string>("m_renderableModel");
+
+                if (renderableModel != null && resources.TryGetValue(renderableModel, out var newResource))
+                {
                     var layerIndex = sceneObject.GetIntegerProperty("m_nLayer");
                     var aggregate = new SceneAggregate(scene, (Model)newResource.DataBlock)
                     {
