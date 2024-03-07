@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using GUI.Utils;
 using OpenTK.Graphics.OpenGL;
 using SteamDatabase.ValvePak;
@@ -240,6 +241,23 @@ namespace GUI.Types.Renderer
                 .OrderByDescending(x => IsCubemapOrProbe(x.Item2) || IsFog(x.Item2));
 
             Entities.AddRange(entities);
+
+            Parallel.ForEach(entities, (entity) =>
+            {
+                var model = entity.GetProperty<string>("model");
+                var particle = entity.GetProperty<string>("effect_name");
+
+                if (model != null)
+                {
+                    var resource = guiContext.LoadFileCompiled(model);
+                    WorldNodeLoader.PreloadInnerFilesForResource(resource, guiContext.FileLoader);
+                }
+
+                if (particle != null)
+                {
+                    guiContext.LoadFileCompiled(particle);
+                }
+            });
 
             foreach (var (entity, classname) in entitiesReordered)
             {

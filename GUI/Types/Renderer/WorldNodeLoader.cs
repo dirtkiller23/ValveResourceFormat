@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using GUI.Utils;
 using ValveResourceFormat;
+using ValveResourceFormat.IO;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization;
 
@@ -29,18 +30,18 @@ namespace GUI.Types.Renderer
             }
         }
 
-        private void PreloadInnerFilesForResource(Resource resource)
+        public static void PreloadInnerFilesForResource(Resource resource, IFileLoader loader)
         {
             if (resource.ResourceType == ResourceType.Model)
             {
                 var model = (Model)resource.DataBlock;
-                model.GetReferencedAnimations(guiContext.FileLoader);
+                model.GetReferencedAnimations(loader);
 
                 // TODO: subpar
                 var meshNamesForLod1 = model.GetReferenceMeshNamesAndLoD().Where(m => (m.LoDMask & 1) != 0).ToList();
                 foreach (var refMesh in meshNamesForLod1)
                 {
-                    var newResource = guiContext.LoadFileCompiled(refMesh.MeshName);
+                    var newResource = loader.LoadFileCompiled(refMesh.MeshName);
 
                     if (newResource != null)
                     {
@@ -57,6 +58,7 @@ namespace GUI.Types.Renderer
             var defaultLightingOrigin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             // Output is WorldNode_t we need to iterate m_sceneObjects inside it
 
+            // TODO: Remove this, we can use file loader cache instead
             var resources = new ConcurrentDictionary<string, Resource>(
                 concurrencyLevel: Environment.ProcessorCount,
                 capacity: Math.Max(node.AggregateSceneObjects.Count, node.SceneObjects.Count)
@@ -73,7 +75,7 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
-                        PreloadInnerFilesForResource(newResource);
+                        PreloadInnerFilesForResource(newResource, guiContext.FileLoader);
                         resources.TryAdd(renderableModel, newResource);
                     }
                 }
@@ -84,7 +86,7 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
-                        PreloadInnerFilesForResource(newResource);
+                        PreloadInnerFilesForResource(newResource, guiContext.FileLoader);
                         resources.TryAdd(renderable, newResource);
                     }
                 }
@@ -158,7 +160,7 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
-                        PreloadInnerFilesForResource(newResource);
+                        PreloadInnerFilesForResource(newResource, guiContext.FileLoader);
                         resources.TryAdd(renderableModel, newResource);
                     }
                 }
