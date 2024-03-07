@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading.Tasks;
 using GUI.Utils;
 using ValveResourceFormat;
@@ -28,6 +29,22 @@ namespace GUI.Types.Renderer
             }
         }
 
+        private void PreloadInnerFilesForResource(Resource resource)
+        {
+            if (resource.ResourceType == ResourceType.Model)
+            {
+                var model = (Model)resource.DataBlock;
+                model.GetReferencedAnimations(guiContext.FileLoader);
+
+                // TODO: subpar
+                var meshNamesForLod1 = model.GetReferenceMeshNamesAndLoD().Where(m => (m.LoDMask & 1) != 0).ToList();
+                foreach (var refMesh in meshNamesForLod1)
+                {
+                    var newResource = guiContext.LoadFileCompiled(refMesh.MeshName);
+                }
+            }
+        }
+
         public void Load(Scene scene)
         {
             var i = 0;
@@ -50,6 +67,7 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
+                        PreloadInnerFilesForResource(newResource);
                         resources.TryAdd(renderableModel, newResource);
                     }
                 }
@@ -60,6 +78,7 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
+                        PreloadInnerFilesForResource(newResource);
                         resources.TryAdd(renderable, newResource);
                     }
                 }
@@ -133,6 +152,7 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
+                        PreloadInnerFilesForResource(newResource);
                         resources.TryAdd(renderableModel, newResource);
                     }
                 }
