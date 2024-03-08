@@ -35,7 +35,7 @@ namespace GUI.Types.Renderer
             if (resource.ResourceType == ResourceType.Model)
             {
                 var model = (Model)resource.DataBlock;
-                model.GetReferencedAnimations(loader);
+                model.GetAllAnimations(loader); // This call will cache into CachedAnimations
 
                 // TODO: subpar
                 var meshNamesForLod1 = model.GetReferenceMeshNamesAndLoD().Where(m => (m.LoDMask & 1) != 0).ToList();
@@ -45,10 +45,14 @@ namespace GUI.Types.Renderer
 
                     if (newResource != null)
                     {
-                        var mesh = (Mesh)newResource.DataBlock;
-                        var vbib = mesh.VBIB; // Access vbib to force decode
+                        PreloadInnerFilesForResource(newResource, loader);
                     }
                 }
+            }
+            else if (resource.ResourceType == ResourceType.Mesh)
+            {
+                var mesh = (Mesh)resource.DataBlock;
+                var vbib = mesh.VBIB; // Access vbib to force decode
             }
         }
 
