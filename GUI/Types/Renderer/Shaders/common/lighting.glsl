@@ -59,11 +59,11 @@
     {
         LightProbe probe = GetProbe(fragPosition);
 
-        #if (SCENE_PROBE_TYPE == 1)
-            return probe.Position;
-        #elif (SCENE_PROBE_TYPE == 2)
+        #if (SCENE_PROBE_TYPE == 2)
             return fma(saturate(probe.Position), probe.AtlasScale, probe.AtlasOffset);
         #endif
+
+        return probe.Position;
     }
 
     vec3 CalculateProbeIndirectCoords(vec3 fragPosition)
@@ -83,6 +83,7 @@
 
         return probe.Position;
     }
+#endif
 
 uniform sampler2DShadow g_tShadowDepthBufferDepth;
 
@@ -110,10 +111,6 @@ float CalculateSunShadowMapVisibility(vec3 vPosition)
             shadow += pcfDepth;
         }
     }
-            return probe.Position;
-        #endif
-    }
-#endif
 
     shadow /= 9.0;
     return 1 - shadow;

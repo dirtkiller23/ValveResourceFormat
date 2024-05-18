@@ -56,11 +56,6 @@ namespace GUI.Types.Renderer.UniformBuffers
             GL.NamedBufferSubData(Handle, IntPtr.Zero, Size, cpuBuffer);
         }
 
-        public void BindBufferBase()
-        {
-            GL.BindBufferBase((BufferRangeTarget)Target, BindingPoint, Handle);
-        }
-
         public override void Dispose()
         {
             cpuBufferHandle.Free();

@@ -375,7 +375,6 @@ namespace GUI.Types.Renderer
 
                         CulledShadowDrawCalls[bucket].Add(new MeshBatchRenderer.Request
                         {
-                            Transform = node.Transform,
                             Mesh = mesh,
                             Call = opaqueCall,
                             Node = node,
@@ -554,6 +553,11 @@ namespace GUI.Types.Renderer
             transformBuffer.Create(transformData.ToArray(), 64);
 
             envMapBindingBuffer.Create(LightingInfo.EnvMapBindings, 1);
+        }
+
+        public void SetFogConstants(ViewConstants viewConstants)
+        {
+            FogInfo.SetFogUniforms(viewConstants, FogEnabled);
         }
 
         public void CalculateLightProbeBindings()

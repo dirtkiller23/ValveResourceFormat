@@ -42,7 +42,6 @@ namespace GUI.Types.Renderer
         private OctreeDebugRenderer<SceneNode> staticOctreeRenderer;
         private OctreeDebugRenderer<SceneNode> dynamicOctreeRenderer;
         protected SelectedNodeRenderer selectedNodeRenderer;
-        private Shader depthOnlyShader;
 
         public enum DepthOnlyProgram
         {
@@ -110,9 +109,9 @@ namespace GUI.Types.Renderer
         {
             if (disposing)
             {
+                viewBuffer?.Dispose();
                 Scene?.Dispose();
                 SkyboxScene?.Dispose();
-                viewBuffer?.Dispose();
 
                 GLPaint -= OnPaint;
 
@@ -143,10 +142,10 @@ namespace GUI.Types.Renderer
             viewBuffer = new(ReservedBufferSlots.View);
         }
 
-        void UpdatePerViewGpuBuffer(Scene scene, Camera camera)
+        void UpdatePerViewGpuBuffers(Scene scene, Camera camera)
         {
             camera.SetViewConstants(viewBuffer.Data);
-            //scene.SetFogConstants(viewBuffer.Data);
+            scene.SetFogConstants(viewBuffer.Data);
             viewBuffer.Update();
         }
 
@@ -198,12 +197,6 @@ namespace GUI.Types.Renderer
                 Textures.Add(new(ReservedTextureSlots.FogCubeTexture, "g_tFogCubeTexture", Scene.FogInfo.CubemapFog.CubemapFogTexture));
             }
 
-            if (Scene.FogInfo.CubeFogActive)
-            {
-                Textures.RemoveAll(t => t.Slot == ReservedTextureSlots.FogCubeTexture);
-                Textures.Add(new(ReservedTextureSlots.FogCubeTexture, "g_tFogCubeTexture", Scene.FogInfo.CubemapFog.CubemapFogTexture));
-            }
-
             if (Scene.AllNodes.Any() && this is not GLWorldViewer)
             {
                 var first = true;
@@ -247,7 +240,6 @@ namespace GUI.Types.Renderer
             selectedNodeRenderer = new(Scene, textRenderer);
 
             Picker = new PickingTexture(Scene.GuiContext, OnPicked);
-            depthOnlyShader = GuiContext.ShaderLoader.LoadShader("vrf.depth_only");
 
             var shadowQuality = this switch
             {
@@ -314,7 +306,7 @@ namespace GUI.Types.Renderer
                 Scene.CollectSceneDrawCalls(Camera, lockedCullFrustum);
                 SkyboxScene?.CollectSceneDrawCalls(Camera, lockedCullFrustum);
 
-                UpdatePerViewGpuBuffer(Scene, Camera);
+                UpdatePerViewGpuBuffers(Scene, Camera);
             }
 
             using (new GLDebugGroup("Scenes Render"))
@@ -410,7 +402,7 @@ namespace GUI.Types.Renderer
                     GL.DepthMask(true);
 
                     var oldReplacementShader = renderContext.ReplacementShader;
-                    renderContext.ReplacementShader = depthOnlyShader;
+                    renderContext.ReplacementShader = depthOnlyShaders[(int)DepthOnlyProgram.Static];
 
                     renderContext.Scene = Scene;
                     Scene.DepthPassOpaque(renderContext);

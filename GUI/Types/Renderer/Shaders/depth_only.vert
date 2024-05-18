@@ -14,7 +14,7 @@ layout (location = 0) in vec3 vPOSITION;
 #include "common/animation.glsl"
 #include "common/morph.glsl"
 
-uniform mat4 transform;
+#include "common/instancing.glsl"
 
 void main()
 {

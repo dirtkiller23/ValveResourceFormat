@@ -185,9 +185,9 @@ vec3 EnvBRDF(vec3 specColor, float rough, vec3 N, vec3 V)
 
 vec3 GetCorrectedSampleCoords(vec3 R, in EnvMap envMapData)
 {
-    vec3 localReflectionVector = envMapWorldToLocal * vec4(R, 0.0);
+    vec3 localReflectionVector = envMapData.WorldToLocal * vec4(R, 0.0);
     return envMapData.IsBoxProjection
-        ? CubemapParallaxCorrection(envMapLocalPos, localReflectionVector, envMapBoxMin, envMapBoxMax)
+        ? CubemapParallaxCorrection(envMapData, localReflectionVector)
         : localReflectionVector;
 }
 
