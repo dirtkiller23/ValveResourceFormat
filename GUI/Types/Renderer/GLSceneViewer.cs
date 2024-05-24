@@ -298,14 +298,18 @@ namespace GUI.Types.Renderer
             using (new GLDebugGroup("Update Loop"))
             {
                 Scene.Update(e.FrameTime);
-                SkyboxScene?.Update(e.FrameTime);
-
-                selectedNodeRenderer.Update(new Scene.UpdateContext(e.FrameTime));
-
                 Scene.SetupSceneShadows(Camera);
                 Scene.CollectSceneDrawCalls(Camera, lockedCullFrustum);
-                SkyboxScene?.CollectSceneDrawCalls(Camera, lockedCullFrustum);
+                Scene.UpdateInstanceBuffers();
 
+                if (SkyboxScene is not null)
+                {
+                    SkyboxScene.Update(e.FrameTime);
+                    SkyboxScene.CollectSceneDrawCalls(Camera, lockedCullFrustum);
+                    SkyboxScene.UpdateInstanceBuffers();
+                }
+
+                selectedNodeRenderer.Update(new Scene.UpdateContext(e.FrameTime));
                 UpdatePerViewGpuBuffers(Scene, Camera);
             }
 
