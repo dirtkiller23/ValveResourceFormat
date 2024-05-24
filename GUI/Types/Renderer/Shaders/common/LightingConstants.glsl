@@ -3,16 +3,8 @@
 #define MAX_LIGHTS 256
 #define MAX_ENVMAPS 144
 
-struct LightProbeVolumeData
+layout(std140, binding = 1) uniform LightingConstants
 {
-    mat4 WorldToLocalNormalizer;
-    vec4 Min;
-    vec4 Max;
-    vec4 AtlasScale;
-    vec4 AtlasOffset;
-};
-
-layout(std140, binding = 1) uniform LightingConstants {
     vec2 g_vLightmapUvScale;
     float g_flSunShadowBias;
     float _LightingPadding1;
@@ -34,5 +26,18 @@ layout(std140, binding = 1) uniform LightingConstants {
     vec4[MAX_ENVMAPS] g_vEnvMapProxySphere;
     vec4[MAX_ENVMAPS] g_vEnvMapColorRotated;
     vec4[MAX_ENVMAPS] g_vEnvMapNormalizationSH;
+};
+
+struct LightProbeVolumeData
+{
+    mat4 WorldToLocalNormalizer;
+    vec4 Min;
+    vec4 Max;
+    vec4 AtlasScale;
+    vec4 AtlasOffset;
+};
+
+layout(std140, binding = 2) uniform LPVConstants
+{
     LightProbeVolumeData[MAX_ENVMAPS] g_vLightProbeVolumeData;
 };

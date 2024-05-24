@@ -8,6 +8,7 @@ namespace GUI.Types.Renderer.UniformBuffers
     {
         View = 0,
         Lighting = 1,
+        LightPropagationVolumes = 2,
         EnvmapBinding = 3,
         InstanceBuffer = 4,
         TransformBuffer = 5,

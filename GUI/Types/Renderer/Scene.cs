@@ -41,6 +41,7 @@ namespace GUI.Types.Renderer
         public WorldLightingInfo LightingInfo { get; }
         public WorldFogInfo FogInfo { get; set; } = new();
         private UniformBuffer<LightingConstants> lightingBuffer;
+        private UniformBuffer<LPVConstants> lightProbeBuffer;
         private StorageBuffer envMapBindingBuffer;
         private StorageBuffer instanceBuffer;
         private StorageBuffer transformBuffer;
@@ -149,6 +150,11 @@ namespace GUI.Types.Renderer
                 Data = LightingInfo.LightingData
             };
 
+            lightProbeBuffer = new(ReservedBufferSlots.LightPropagationVolumes)
+            {
+                Data = LightingInfo.LightPropagationVolumes
+            };
+
             envMapBindingBuffer = new(ReservedBufferSlots.EnvmapBinding);
             instanceBuffer = new(ReservedBufferSlots.InstanceBuffer);
             transformBuffer = new(ReservedBufferSlots.TransformBuffer);
@@ -157,6 +163,7 @@ namespace GUI.Types.Renderer
         public void SetSceneBuffers()
         {
             lightingBuffer.BindBufferBase();
+            lightProbeBuffer.BindBufferBase();
             envMapBindingBuffer.BindBufferBase();
             instanceBuffer.BindBufferBase();
             transformBuffer.BindBufferBase();
@@ -613,7 +620,7 @@ namespace GUI.Types.Renderer
                 var index = ProbeList.IndexOf(probe);
                 probe.SetGpuProbeData(
                     LightingInfo.LightProbeType == LightProbeType.ProbeAtlas,
-                    ref LightingInfo.LightingData.LightProbeVolume[index]
+                    ref LightingInfo.LightPropagationVolumes.LightProbeVolume[index]
                 );
             }
 
@@ -826,6 +833,7 @@ namespace GUI.Types.Renderer
         public void Dispose()
         {
             lightingBuffer?.Dispose();
+            lightProbeBuffer?.Dispose();
             envMapBindingBuffer?.Dispose();
             instanceBuffer?.Dispose();
             transformBuffer?.Dispose();

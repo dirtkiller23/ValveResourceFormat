@@ -57,7 +57,7 @@ class SceneLightProbe : SceneNode
     {
     }
 
-    public void SetGpuProbeData(bool isProbeAtlas, ref LightingConstants.LPVData lpv)
+    public void SetGpuProbeData(bool isProbeAtlas, ref LPVData lpv)
     {
         Matrix4x4.Invert(Transform, out var worldToLocal);
 

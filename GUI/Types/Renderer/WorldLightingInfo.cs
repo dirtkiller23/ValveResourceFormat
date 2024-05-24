@@ -35,6 +35,7 @@ partial class Scene
         public int LightmapVersionNumber { get; set; }
         public int LightmapGameVersionNumber { get; set; }
         public LightingConstants LightingData { get; set; } = new();
+        public LPVConstants LightPropagationVolumes { get; set; } = new();
 
         public CubemapType CubemapType
         {
