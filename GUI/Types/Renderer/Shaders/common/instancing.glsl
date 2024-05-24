@@ -7,13 +7,13 @@ struct PerInstancePackedShaderData_t
     uint m_Data[8];
 };
 
-layout(std430, binding = 4) buffer g_instanceBuffer
+layout(std430, binding = 4) readonly buffer g_instanceBuffer
 {
     PerInstancePackedShaderData_t instance[];
 };
 
 
-layout(std430, binding = 5) buffer g_transformBuffer
+layout(std430, binding = 5) readonly buffer g_transformBuffer
 {
     mat4 transform[];
 };

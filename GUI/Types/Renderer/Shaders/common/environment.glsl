@@ -17,7 +17,7 @@
     uniform samplerCubeArray g_tEnvironmentMap;
 #endif
 
-layout(std430, binding = 3) buffer g_envmapInstanceBuffer
+layout(std430, binding = 3) readonly buffer g_envmapInstanceBuffer
 {
     uint g_nEnvMapIndices[];
 };
