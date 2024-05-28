@@ -66,6 +66,7 @@ namespace GUI.Types.Viewers
                 {
                     case ResourceType.Texture:
                     case ResourceType.PanoramaVectorGraphic:
+                    case ResourceType.PostProcessing when ((PostProcessing)resource.DataBlock)?.Data.ContainsKey("m_colorCorrectionVolumeData") ?? false:
                         {
                             var textureControl = new GLTextureViewer(vrfGuiContext, resource);
                             specialTabPage = new TabPage("TEXTURE");
