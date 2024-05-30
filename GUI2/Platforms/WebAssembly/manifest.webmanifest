@@ -1,0 +1,10 @@
+{
+  "background_color": "#ffffff",
+  "description": "Valve Resource Viewer",
+  "display": "standalone",
+  "name": "Valve Resource Viewer",
+  "short_name": "VRV",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/"
+}
