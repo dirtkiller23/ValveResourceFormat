@@ -1,4 +1,13 @@
-using Uno.Resizetizer;
+//using Uno.Resizetizer;
+using Microsoft.UI.Xaml;
+using Uno.Extensions.Navigation;
+using Uno.Extensions.Configuration;
+using Uno.Extensions.Hosting;
+using Uno.Extensions.Navigation.Toolkit.WinUI;
+using Uno.Extensions.Toolkit;
+using Uno.Extensions;
+using Uno.Extensions.Localization;
+using Uno.UI;
 
 namespace GUI2;
 public partial class App : Application
@@ -74,7 +83,7 @@ public partial class App : Application
 #if DEBUG
         MainWindow.EnableHotReload();
 #endif
-        MainWindow.SetWindowIcon();
+        // MainWindow.SetWindowIcon();
 
         Host = await builder.NavigateAsync<MainPage>();
     }
