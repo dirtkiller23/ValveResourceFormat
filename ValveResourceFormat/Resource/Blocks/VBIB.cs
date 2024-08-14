@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -28,8 +29,33 @@ namespace ValveResourceFormat.Blocks
             public uint ElementSizeInBytes;
             //Vertex attribs. Empty for index buffers
             public RenderInputLayoutField[] InputLayoutFields;
-            public byte[] Data;
 
+            private byte[] rawData;
+            public readonly byte[] RawData => rawData;
+            public readonly bool IsCompressed => rawData.Length < TotalSizeInBytes;
+
+            public byte[] Data
+            {
+                get
+                {
+                    if (IsCompressed)
+                    {
+                        var uncompressed = IsVertex
+                            ? MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)ElementCount, (int)ElementSizeInBytes, rawData)
+                            : MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)ElementCount, (int)ElementSizeInBytes, rawData);
+
+                        Debug.Assert(uncompressed.Length == TotalSizeInBytes);
+
+                        rawData = uncompressed;
+                        return uncompressed;
+                    }
+
+                    return rawData;
+                }
+                set => rawData = value;
+            }
+
+            public readonly bool IsVertex => InputLayoutFields.Length > 0;
             public readonly uint TotalSizeInBytes => ElementCount * ElementSizeInBytes;
         }
 
@@ -57,25 +83,12 @@ namespace ValveResourceFormat.Blocks
             foreach (var vb in vertexBuffers)
             {
                 var vertexBuffer = BufferDataFromDATA(vb);
-
-                var decompressedSize = vertexBuffer.TotalSizeInBytes;
-                if (vertexBuffer.Data.Length != decompressedSize)
-                {
-                    vertexBuffer.Data = MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)vertexBuffer.ElementCount, (int)vertexBuffer.ElementSizeInBytes, vertexBuffer.Data);
-                }
                 VertexBuffers.Add(vertexBuffer);
             }
             var indexBuffers = data.GetArray("m_indexBuffers");
             foreach (var ib in indexBuffers)
             {
                 var indexBuffer = BufferDataFromDATA(ib);
-
-                var decompressedSize = indexBuffer.TotalSizeInBytes;
-                if (indexBuffer.Data.Length != decompressedSize)
-                {
-                    indexBuffer.Data = MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)indexBuffer.ElementCount, (int)indexBuffer.ElementSizeInBytes, indexBuffer.Data);
-                }
-
                 IndexBuffers.Add(indexBuffer);
             }
         }
@@ -123,6 +136,11 @@ namespace ValveResourceFormat.Blocks
             var attributeOffset = reader.ReadUInt32();  //8
             var attributeCount = reader.ReadUInt32();   //12
 
+            if (!isVertex)
+            {
+                Debug.Assert(attributeCount == 0);
+            }
+
             var refB = reader.BaseStream.Position;
             var dataOffset = reader.ReadUInt32();       //16
             var totalSize = reader.ReadInt32();        //20
@@ -150,35 +168,7 @@ namespace ValveResourceFormat.Blocks
 
             reader.BaseStream.Position = refB + dataOffset;
 
-            var decompressedSize = (int)buffer.TotalSizeInBytes;
-
-            if (totalSize != decompressedSize)
-            {
-                var temp = ArrayPool<byte>.Shared.Rent(totalSize);
-
-                try
-                {
-                    var span = temp.AsSpan(0, totalSize);
-                    reader.Read(span);
-
-                    if (isVertex)
-                    {
-                        buffer.Data = MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)buffer.ElementCount, (int)buffer.ElementSizeInBytes, span);
-                    }
-                    else
-                    {
-                        buffer.Data = MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)buffer.ElementCount, (int)buffer.ElementSizeInBytes, span);
-                    }
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(temp);
-                }
-            }
-            else
-            {
-                buffer.Data = reader.ReadBytes(totalSize);
-            }
+            buffer.Data = reader.ReadBytes(totalSize);
 
             reader.BaseStream.Position = refB + 8; //Go back to the index array to read the next iteration.
 

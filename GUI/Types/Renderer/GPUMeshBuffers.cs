@@ -1,6 +1,8 @@
 
+using System.Buffers;
 using OpenTK.Graphics.OpenGL;
 using ValveResourceFormat.Blocks;
+using ValveResourceFormat.Compression;
 
 namespace GUI.Types.Renderer
 {
@@ -16,7 +18,7 @@ namespace GUI.Types.Renderer
 
             for (var i = 0; i < vbib.VertexBuffers.Count; i++)
             {
-                GL.NamedBufferData(VertexBuffers[i], (IntPtr)(vbib.VertexBuffers[i].ElementCount * vbib.VertexBuffers[i].ElementSizeInBytes), vbib.VertexBuffers[i].Data, BufferUsageHint.StaticDraw);
+                LoadGPUBuffer(VertexBuffers[i], vbib.VertexBuffers[i]);
             }
 
             IndexBuffers = new int[vbib.IndexBuffers.Count];
@@ -24,7 +26,36 @@ namespace GUI.Types.Renderer
 
             for (var i = 0; i < vbib.IndexBuffers.Count; i++)
             {
-                GL.NamedBufferData(IndexBuffers[i], (IntPtr)(vbib.IndexBuffers[i].ElementCount * vbib.IndexBuffers[i].ElementSizeInBytes), vbib.IndexBuffers[i].Data, BufferUsageHint.StaticDraw);
+                LoadGPUBuffer(IndexBuffers[i], vbib.IndexBuffers[i]);
+            }
+        }
+
+        private static void LoadGPUBuffer(int gpuBufferHandle, VBIB.OnDiskBufferData diskBuffer)
+        {
+            if (!diskBuffer.IsCompressed)
+            {
+                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSizeInBytes, diskBuffer.RawData, BufferUsageHint.StaticDraw);
+                return;
+            }
+
+            var uncompressed = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSizeInBytes);
+
+            try
+            {
+                if (diskBuffer.IsVertex)
+                {
+                    MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)diskBuffer.ElementCount, (int)diskBuffer.ElementSizeInBytes, diskBuffer.RawData, uncompressed.AsSpan(), useSimd: true);
+                }
+                else
+                {
+                    MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)diskBuffer.ElementCount, (int)diskBuffer.ElementSizeInBytes, diskBuffer.RawData, uncompressed.AsSpan());
+                }
+
+                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSizeInBytes, uncompressed, BufferUsageHint.StaticDraw);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(uncompressed);
             }
         }
     }

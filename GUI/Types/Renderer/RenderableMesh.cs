@@ -74,12 +74,12 @@ namespace GUI.Types.Renderer
 
             foreach (var a in vbib.VertexBuffers)
             {
-                Hasher.Append(a.Data);
+                Hasher.Append(a.RawData);
             }
 
             foreach (var a in vbib.IndexBuffers)
             {
-                Hasher.Append(a.Data);
+                Hasher.Append(a.RawData);
             }
 
             VBIBHashCode = Hasher.GetCurrentHashAsUInt64();

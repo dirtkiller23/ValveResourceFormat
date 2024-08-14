@@ -23,7 +23,7 @@ namespace ValveResourceFormat.Compression
             offset = (offset + (cond ? 1 : 0)) & 15;
         }
 
-        private static uint DecodeVByte(Span<byte> data, ref int position)
+        private static uint DecodeVByte(ReadOnlySpan<byte> data, ref int position)
         {
             var lead = (uint)data[position++];
 
@@ -50,7 +50,7 @@ namespace ValveResourceFormat.Compression
             return result;
         }
 
-        private static uint DecodeIndex(Span<byte> data, uint last, ref int position)
+        private static uint DecodeIndex(ReadOnlySpan<byte> data, uint last, ref int position)
         {
             var v = DecodeVByte(data, ref position);
             var d = (uint)((v >> 1) ^ -(v & 1));
@@ -77,6 +77,13 @@ namespace ValveResourceFormat.Compression
         }
 
         public static byte[] DecodeIndexBuffer(int indexCount, int indexSize, Span<byte> buffer)
+        {
+            var destinationArray = new byte[indexCount * indexSize];
+            DecodeIndexBuffer(indexCount, indexSize, buffer, destinationArray.AsSpan());
+            return destinationArray;
+        }
+
+        public static Span<byte> DecodeIndexBuffer(int indexCount, int indexSize, ReadOnlySpan<byte> buffer, Span<byte> destination)
         {
             if (indexCount % 3 != 0)
             {
@@ -123,8 +130,6 @@ namespace ValveResourceFormat.Compression
 
             var codeauxTable = buffer[^16..];
 
-            var destinationArray = new byte[indexCount * indexSize];
-            var destination = destinationArray.AsSpan();
             var position = 0;
 
             for (var i = 0; i < indexCount; i += 3)
@@ -243,7 +248,7 @@ namespace ValveResourceFormat.Compression
                 throw new InvalidDataException("we didn't read all data bytes and stopped before the boundary between data and codeaux table");
             }
 
-            return destinationArray;
+            return destination;
         }
     }
 }

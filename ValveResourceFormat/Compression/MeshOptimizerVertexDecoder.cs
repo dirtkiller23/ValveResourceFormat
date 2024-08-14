@@ -32,7 +32,7 @@ namespace ValveResourceFormat.Compression
             return (byte)(-(v & 1) ^ (v >> 1));
         }
 
-        private static Span<byte> DecodeBytesGroup(Span<byte> data, Span<byte> destination, int bitslog2)
+        private static ReadOnlySpan<byte> DecodeBytesGroup(ReadOnlySpan<byte> data, Span<byte> destination, int bitslog2)
         {
             int dataVar;
             byte b;
@@ -136,7 +136,7 @@ namespace ValveResourceFormat.Compression
             }
         }
 
-        private static Span<byte> DecodeBytes(Span<byte> data, Span<byte> destination)
+        private static ReadOnlySpan<byte> DecodeBytes(ReadOnlySpan<byte> data, Span<byte> destination)
         {
             if (destination.Length % ByteGroupSize != 0)
             {
@@ -165,7 +165,7 @@ namespace ValveResourceFormat.Compression
             return data;
         }
 
-        private static Span<byte> DecodeVertexBlock(Span<byte> data, Span<byte> vertexData, int vertexCount, int vertexSize, Span<byte> lastVertex)
+        private static ReadOnlySpan<byte> DecodeVertexBlock(ReadOnlySpan<byte> data, Span<byte> vertexData, int vertexCount, int vertexSize, Span<byte> lastVertex)
         {
             if (vertexCount <= 0 || vertexCount > VertexBlockMaxSize)
             {
@@ -213,7 +213,14 @@ namespace ValveResourceFormat.Compression
             return data;
         }
 
-        public static byte[] DecodeVertexBuffer(int vertexCount, int vertexSize, Span<byte> buffer, bool useSimd = true)
+        public static byte[] DecodeVertexBuffer(int vertexCount, int vertexSize, ReadOnlySpan<byte> buffer, bool useSimd = true)
+        {
+            var resultArray = new byte[vertexCount * vertexSize];
+            DecodeVertexBuffer(vertexCount, vertexSize, buffer, resultArray, useSimd);
+            return resultArray;
+        }
+
+        public static Span<byte> DecodeVertexBuffer(int vertexCount, int vertexSize, ReadOnlySpan<byte> buffer, Span<byte> result, bool useSimd = true)
         {
             if (vertexSize <= 0 || vertexSize > 256)
             {
@@ -230,6 +237,11 @@ namespace ValveResourceFormat.Compression
                 throw new ArgumentException("Vertex buffer is too short.");
             }
 
+            if (result.Length < vertexCount * vertexSize)
+            {
+                throw new ArgumentException("Result buffer is too short.");
+            }
+
             if ((buffer[0] & 0xF0) != VertexHeader)
             {
                 throw new ArgumentException($"Invalid vertex buffer header, expected {VertexHeader} but got {buffer[0]}.");
@@ -244,7 +256,6 @@ namespace ValveResourceFormat.Compression
 
             buffer = buffer[1..];
 
-            var resultArray = new byte[vertexCount * vertexSize];
 
             // C code always uses [256] here, but more than vertexSize can't be used
             var lastVertexBuffer = ArrayPool<byte>.Shared.Rent(vertexSize);
@@ -257,8 +268,6 @@ namespace ValveResourceFormat.Compression
                 var vertexBlockSize = GetVertexBlockSize(vertexSize);
 
                 var vertexOffset = 0;
-
-                var result = resultArray.AsSpan();
 
                 useSimd &= IsHardwareAccelerated;
 
@@ -294,7 +303,7 @@ namespace ValveResourceFormat.Compression
                 throw new ArgumentException("Tail size incorrect");
             }
 
-            return resultArray;
+            return result;
         }
     }
 }
