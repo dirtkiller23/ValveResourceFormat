@@ -29,6 +29,8 @@ namespace ValveResourceFormat.Blocks
             //Vertex attribs. Empty for index buffers
             public RenderInputLayoutField[] InputLayoutFields;
             public byte[] Data;
+
+            public readonly uint TotalSizeInBytes => ElementCount * ElementSizeInBytes;
         }
 
         public struct RenderInputLayoutField
@@ -56,7 +58,7 @@ namespace ValveResourceFormat.Blocks
             {
                 var vertexBuffer = BufferDataFromDATA(vb);
 
-                var decompressedSize = vertexBuffer.ElementCount * vertexBuffer.ElementSizeInBytes;
+                var decompressedSize = vertexBuffer.TotalSizeInBytes;
                 if (vertexBuffer.Data.Length != decompressedSize)
                 {
                     vertexBuffer.Data = MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)vertexBuffer.ElementCount, (int)vertexBuffer.ElementSizeInBytes, vertexBuffer.Data);
@@ -68,7 +70,7 @@ namespace ValveResourceFormat.Blocks
             {
                 var indexBuffer = BufferDataFromDATA(ib);
 
-                var decompressedSize = indexBuffer.ElementCount * indexBuffer.ElementSizeInBytes;
+                var decompressedSize = indexBuffer.TotalSizeInBytes;
                 if (indexBuffer.Data.Length != decompressedSize)
                 {
                     indexBuffer.Data = MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)indexBuffer.ElementCount, (int)indexBuffer.ElementSizeInBytes, indexBuffer.Data);
@@ -148,7 +150,7 @@ namespace ValveResourceFormat.Blocks
 
             reader.BaseStream.Position = refB + dataOffset;
 
-            var decompressedSize = (int)(buffer.ElementCount * buffer.ElementSizeInBytes);
+            var decompressedSize = (int)buffer.TotalSizeInBytes;
 
             if (totalSize != decompressedSize)
             {
@@ -750,7 +752,7 @@ namespace ValveResourceFormat.Blocks
                     var formatSize = formatElementSize * formatElementCount;
                     buf.Data = [.. buf.Data];
                     var bufSpan = buf.Data.AsSpan();
-                    var maxRemapTableIdx = remapTable.Length - 1;
+                    var maxRemapTableIdx = (uint)remapTable.Length - 1;
                     for (var i = (int)field.Offset; i < buf.Data.Length; i += (int)buf.ElementSizeInBytes)
                     {
                         for (var j = 0; j < formatSize; j += formatElementSize)
