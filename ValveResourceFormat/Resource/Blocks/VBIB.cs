@@ -32,7 +32,7 @@ namespace ValveResourceFormat.Blocks
 
             private byte[] rawData;
             public readonly byte[] RawData => rawData;
-            public readonly bool IsCompressed => rawData.Length < TotalSizeInBytes;
+            public readonly bool IsCompressed => rawData.Length != TotalSizeInBytes;
 
             public byte[] Data
             {

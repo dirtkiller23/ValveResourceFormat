@@ -83,7 +83,7 @@ namespace ValveResourceFormat.Compression
             return destinationArray;
         }
 
-        public static Span<byte> DecodeIndexBuffer(int indexCount, int indexSize, ReadOnlySpan<byte> buffer, Span<byte> destination)
+        public static int DecodeIndexBuffer(int indexCount, int indexSize, ReadOnlySpan<byte> buffer, Span<byte> destination)
         {
             if (indexCount % 3 != 0)
             {
@@ -248,7 +248,7 @@ namespace ValveResourceFormat.Compression
                 throw new InvalidDataException("we didn't read all data bytes and stopped before the boundary between data and codeaux table");
             }
 
-            return destination;
+            return indexCount * indexSize;
         }
     }
 }
