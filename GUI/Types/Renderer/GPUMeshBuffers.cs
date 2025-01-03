@@ -1,8 +1,8 @@
 
 using System.Buffers;
+using System.IO;
 using OpenTK.Graphics.OpenGL;
 using ValveResourceFormat.Blocks;
-using ValveResourceFormat.Compression;
 
 namespace GUI.Types.Renderer
 {
@@ -18,7 +18,7 @@ namespace GUI.Types.Renderer
 
             for (var i = 0; i < vbib.VertexBuffers.Count; i++)
             {
-                LoadGPUBuffer(VertexBuffers[i], vbib.VertexBuffers[i]);
+                LoadGPUBuffer(VertexBuffers[i], vbib.VertexBuffers[i], vbib.Reader);
             }
 
             IndexBuffers = new int[vbib.IndexBuffers.Count];
@@ -26,37 +26,33 @@ namespace GUI.Types.Renderer
 
             for (var i = 0; i < vbib.IndexBuffers.Count; i++)
             {
-                LoadGPUBuffer(IndexBuffers[i], vbib.IndexBuffers[i]);
+                LoadGPUBuffer(IndexBuffers[i], vbib.IndexBuffers[i], vbib.Reader);
             }
         }
 
-        private static void LoadGPUBuffer(int gpuBufferHandle, VBIB.OnDiskBufferData diskBuffer)
+        private static void LoadGPUBuffer(int gpuBufferHandle, VBIB.OnDiskBufferData diskBuffer, BinaryReader reader)
         {
-            if (!diskBuffer.IsCompressed)
+            // Data already exists in CPU, as a byte array.
+            // This is common on older models that have keyvalues based VBIB.
+            if (diskBuffer.Data != null)
             {
-                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSize, diskBuffer.RawData, BufferUsageHint.StaticDraw);
+                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSize, diskBuffer.Data, BufferUsageHint.StaticDraw);
                 return;
             }
 
-            var uncompressed = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSize);
+            // Data needs to be read from the resource stream.
+            var data = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSize);
+            diskBuffer.ReadFromResourceStream(reader, data.AsSpan());
 
             try
             {
-                if (diskBuffer.IsVertex)
-                {
-                    MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)diskBuffer.ElementCount, (int)diskBuffer.ElementSizeInBytes, diskBuffer.RawData, uncompressed.AsSpan(), useSimd: true);
-                }
-                else
-                {
-                    MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)diskBuffer.ElementCount, (int)diskBuffer.ElementSizeInBytes, diskBuffer.RawData, uncompressed.AsSpan());
-                }
-
-                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSize, uncompressed, BufferUsageHint.StaticDraw);
+                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSize, data, BufferUsageHint.StaticDraw);
             }
             finally
             {
-                ArrayPool<byte>.Shared.Return(uncompressed);
+                ArrayPool<byte>.Shared.Return(data);
             }
+
         }
     }
 }

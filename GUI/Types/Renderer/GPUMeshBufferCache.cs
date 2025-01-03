@@ -8,7 +8,7 @@ namespace GUI.Types.Renderer
 {
     class GPUMeshBufferCache
     {
-        private readonly Dictionary<ulong, GPUMeshBuffers> gpuBuffers = [];
+        private readonly Dictionary<int, GPUMeshBuffers> gpuBuffers = [];
         private readonly Dictionary<VAOKey, int> vertexArrayObjects = [];
         private QuadIndexBuffer quadIndices;
 
@@ -45,7 +45,7 @@ namespace GUI.Types.Renderer
             public uint IndexIndex;
         }
 
-        public void CreateVertexIndexBuffers(ulong key, VBIB vbib)
+        public void CreateVertexIndexBuffers(int key, VBIB vbib)
         {
             if (!gpuBuffers.ContainsKey(key))
             {
@@ -54,7 +54,7 @@ namespace GUI.Types.Renderer
             }
         }
 
-        public int GetVertexArrayObject(ulong key, VertexDrawBuffer curVertexBuffer, RenderMaterial material, uint idxIndex)
+        public int GetVertexArrayObject(int key, VertexDrawBuffer curVertexBuffer, RenderMaterial material, uint idxIndex)
         {
             var gpuVbib = gpuBuffers[key];
             var vaoKey = new VAOKey

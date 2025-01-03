@@ -1,4 +1,3 @@
-using System.IO.Hashing;
 using System.Linq;
 using GUI.Utils;
 using OpenTK.Graphics.OpenGL;
@@ -13,8 +12,6 @@ namespace GUI.Types.Renderer
 {
     class RenderableMesh
     {
-        private static readonly XxHash3 Hasher = new(StringToken.MURMUR2SEED);
-
         public AABB BoundingBox { get; }
         public Vector4 Tint { get; set; } = Vector4.One;
 
@@ -33,7 +30,7 @@ namespace GUI.Types.Renderer
 
         public FlexStateManager FlexStateManager { get; }
 
-        private readonly ulong VBIBHashCode;
+        private readonly int VBIBHashCode;
 
 #if DEBUG
         private readonly string DebugLabel;
@@ -72,18 +69,7 @@ namespace GUI.Types.Renderer
 
             BoneWeightCount = mesh.Data.GetSubCollection("m_skeleton").GetInt32Property("m_nBoneWeightCount");
 
-            foreach (var a in vbib.VertexBuffers)
-            {
-                Hasher.Append(a.RawData);
-            }
-
-            foreach (var a in vbib.IndexBuffers)
-            {
-                Hasher.Append(a.RawData);
-            }
-
-            VBIBHashCode = Hasher.GetCurrentHashAsUInt64();
-            Hasher.Reset();
+            VBIBHashCode = vbib.GetHashCode();
 
             mesh.GetBounds();
             BoundingBox = new AABB(mesh.MinBounds, mesh.MaxBounds);
