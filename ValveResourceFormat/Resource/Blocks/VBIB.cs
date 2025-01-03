@@ -30,6 +30,9 @@ namespace ValveResourceFormat.Blocks
             //Vertex attribs. Empty for index buffers
             public RenderInputLayoutField[] InputLayoutFields;
 
+            public uint DataOffset;
+            public int DataSize;
+
             private byte[] rawData;
             public readonly byte[] RawData => rawData;
             public readonly bool IsCompressed => rawData.Length != TotalSizeInBytes;
@@ -142,8 +145,8 @@ namespace ValveResourceFormat.Blocks
             }
 
             var refB = reader.BaseStream.Position;
-            var dataOffset = reader.ReadUInt32();       //16
-            var totalSize = reader.ReadInt32();        //20
+            buffer.DataOffset = (uint)refB + reader.ReadUInt32(); //16
+            buffer.DataSize = reader.ReadInt32();        //20
 
             reader.BaseStream.Position = refA + attributeOffset;
             buffer.InputLayoutFields = Enumerable.Range(0, (int)attributeCount)
@@ -166,9 +169,8 @@ namespace ValveResourceFormat.Blocks
                 })
                 .ToArray();
 
-            reader.BaseStream.Position = refB + dataOffset;
-
-            buffer.Data = reader.ReadBytes(totalSize);
+            reader.BaseStream.Position = buffer.DataOffset;
+            buffer.Data = reader.ReadBytes(buffer.DataSize);
 
             reader.BaseStream.Position = refB + 8; //Go back to the index array to read the next iteration.
 
