@@ -20,6 +20,7 @@ namespace ValveResourceFormat.Blocks
 
         public List<OnDiskBufferData> VertexBuffers { get; }
         public List<OnDiskBufferData> IndexBuffers { get; }
+        public BinaryReader Reader { get; set; }
 
 #pragma warning disable CA1051 // Do not declare visible instance fields
         public struct OnDiskBufferData
@@ -29,37 +30,58 @@ namespace ValveResourceFormat.Blocks
             public uint ElementSizeInBytes;
             //Vertex attribs. Empty for index buffers
             public RenderInputLayoutField[] InputLayoutFields;
+            public byte[] Data;
 
             public uint DataOffset;
             public int DataSize;
 
-            private byte[] rawData;
-            public readonly byte[] RawData => rawData;
-            public readonly bool IsCompressed => rawData.Length != TotalSizeInBytes;
+            public readonly bool IsVertex => InputLayoutFields.Length > 0;
+            public readonly bool IsCompressed => DataSize != TotalSize;
+            public readonly uint TotalSize => ElementCount * ElementSizeInBytes;
 
-            public byte[] Data
+            public void ReadData(BinaryReader reader) => Data ??= ReadFromResourceStream(reader);
+
+            public readonly byte[] ReadFromResourceStream(BinaryReader reader)
             {
-                get
-                {
-                    if (IsCompressed)
-                    {
-                        var uncompressed = IsVertex
-                            ? MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)ElementCount, (int)ElementSizeInBytes, rawData)
-                            : MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)ElementCount, (int)ElementSizeInBytes, rawData);
-
-                        Debug.Assert(uncompressed.Length == TotalSizeInBytes);
-
-                        rawData = uncompressed;
-                        return uncompressed;
-                    }
-
-                    return rawData;
-                }
-                set => rawData = value;
+                var data = new byte[TotalSize];
+                ReadFromResourceStream(reader, data.AsSpan());
+                return data;
             }
 
-            public readonly bool IsVertex => InputLayoutFields.Length > 0;
-            public readonly uint TotalSizeInBytes => ElementCount * ElementSizeInBytes;
+            /// <summary>
+            /// Read the data from the resource binary stream and decompress it if needed.
+            /// </summary>
+            public readonly int ReadFromResourceStream(BinaryReader reader, Span<byte> data)
+            {
+                reader.BaseStream.Position = DataOffset;
+
+                if (!IsCompressed)
+                {
+                    return reader.Read(data);
+                }
+
+                var compressedSize = DataSize;
+                var temp = ArrayPool<byte>.Shared.Rent(compressedSize);
+
+                try
+                {
+                    var compressedBuffer = temp.AsSpan(0, compressedSize);
+                    reader.Read(compressedBuffer);
+
+                    if (IsVertex)
+                    {
+                        return MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)ElementCount, (int)ElementSizeInBytes, compressedBuffer, data);
+                    }
+                    else
+                    {
+                        return MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)ElementCount, (int)ElementSizeInBytes, compressedBuffer, data);
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(temp);
+                }
+            }
         }
 
         public struct RenderInputLayoutField
@@ -85,7 +107,7 @@ namespace ValveResourceFormat.Blocks
             var vertexBuffers = data.GetArray("m_vertexBuffers");
             foreach (var vb in vertexBuffers)
             {
-                var vertexBuffer = BufferDataFromDATA(vb);
+                var vertexBuffer = BufferDataFromDATA(vb, isVertex: true);
                 VertexBuffers.Add(vertexBuffer);
             }
             var indexBuffers = data.GetArray("m_indexBuffers");
@@ -99,6 +121,7 @@ namespace ValveResourceFormat.Blocks
         public override void Read(BinaryReader reader, Resource resource)
         {
             reader.BaseStream.Position = Offset;
+            Reader = reader;
 
             var vertexBufferOffset = reader.ReadUInt32();
             var vertexBufferCount = reader.ReadUInt32();
@@ -117,12 +140,25 @@ namespace ValveResourceFormat.Blocks
             reader.BaseStream.Position = Offset + 8 + indexBufferOffset; //8 to take into account vertexOffset / count
             for (var i = 0; i < indexBufferCount; i++)
             {
-                var indexBuffer = ReadOnDiskBufferData(reader, isVertex: false);
+                var indexBuffer = ReadOnDiskBufferData(reader);
                 IndexBuffers.Add(indexBuffer);
             }
         }
 
-        private static OnDiskBufferData ReadOnDiskBufferData(BinaryReader reader, bool isVertex)
+        public void EnsureOnDiskBuffersLoaded()
+        {
+            foreach (var buffer in VertexBuffers)
+            {
+                buffer.ReadData(Reader);
+            }
+
+            foreach (var buffer in IndexBuffers)
+            {
+                buffer.ReadData(Reader);
+            }
+        }
+
+        private static OnDiskBufferData ReadOnDiskBufferData(BinaryReader reader, bool isVertex = false)
         {
             var buffer = default(OnDiskBufferData);
 
@@ -177,7 +213,7 @@ namespace ValveResourceFormat.Blocks
             return buffer;
         }
 
-        private static OnDiskBufferData BufferDataFromDATA(KVObject data)
+        private static OnDiskBufferData BufferDataFromDATA(KVObject data, bool isVertex = false)
         {
             var buffer = new OnDiskBufferData
             {
@@ -199,6 +235,13 @@ namespace ValveResourceFormat.Blocks
             }).ToArray();
 
             buffer.Data = data.GetArray<byte>("m_pData");
+
+            if (buffer.Data.Length != buffer.TotalSize)
+            {
+                buffer.Data = isVertex
+                    ? MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)buffer.ElementCount, (int)buffer.ElementSizeInBytes, buffer.Data, useSimd: true)
+                    : MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)buffer.ElementCount, (int)buffer.ElementSizeInBytes, buffer.Data);
+            }
 
             return buffer;
         }

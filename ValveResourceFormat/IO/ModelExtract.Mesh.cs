@@ -339,6 +339,8 @@ partial class ModelExtract
     {
         var mdat = mesh.Data;
         var mbuf = mesh.VBIB;
+        mbuf.EnsureOnDiskBuffersLoaded();
+
         var indexBuffers = mbuf.IndexBuffers.Select(ib => new Lazy<int[]>(() => GltfModelExporter.ReadIndices(ib, 0, (int)ib.ElementCount, 0))).ToArray();
 
         var datamodel = new Datamodel.Datamodel("model", 22);

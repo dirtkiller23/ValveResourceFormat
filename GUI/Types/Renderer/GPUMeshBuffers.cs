@@ -34,11 +34,11 @@ namespace GUI.Types.Renderer
         {
             if (!diskBuffer.IsCompressed)
             {
-                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSizeInBytes, diskBuffer.RawData, BufferUsageHint.StaticDraw);
+                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSize, diskBuffer.RawData, BufferUsageHint.StaticDraw);
                 return;
             }
 
-            var uncompressed = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSizeInBytes);
+            var uncompressed = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSize);
 
             try
             {
@@ -51,7 +51,7 @@ namespace GUI.Types.Renderer
                     MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)diskBuffer.ElementCount, (int)diskBuffer.ElementSizeInBytes, diskBuffer.RawData, uncompressed.AsSpan());
                 }
 
-                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSizeInBytes, uncompressed, BufferUsageHint.StaticDraw);
+                GL.NamedBufferData(gpuBufferHandle, (IntPtr)diskBuffer.TotalSize, uncompressed, BufferUsageHint.StaticDraw);
             }
             finally
             {

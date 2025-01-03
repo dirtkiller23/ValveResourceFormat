@@ -384,6 +384,7 @@ public partial class GltfModelExporter
         }
 
         var vbib = vmesh.VBIB;
+        vbib.EnsureOnDiskBuffersLoaded();
         var vertexBufferAccessors = CreateVertexBufferAccessors(exportedModel, vbib, includeJoints: false);
 
         var transformIndex = 0;
