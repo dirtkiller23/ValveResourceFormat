@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Threading;
 using ValveResourceFormat.Blocks;
 using ValveResourceFormat.Blocks.ResourceEditInfoStructs;
 using ValveResourceFormat.CompiledShader;
@@ -23,6 +24,8 @@ namespace ValveResourceFormat
         /// </summary>
         /// <value>The binary reader.</value>
         public BinaryReader Reader { get; private set; }
+
+        public Lock ReaderLock { get; } = new Lock();
 
         /// <summary>
         /// Gets or sets the file name this resource was parsed from.

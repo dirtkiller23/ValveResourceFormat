@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using ValveResourceFormat.Compression;
 using ValveResourceFormat.Serialization;
 using ValveResourceFormat.Serialization.KeyValues;
@@ -21,6 +22,7 @@ namespace ValveResourceFormat.Blocks
         public List<OnDiskBufferData> VertexBuffers { get; }
         public List<OnDiskBufferData> IndexBuffers { get; }
         public BinaryReader Reader { get; set; }
+        public Lock ReaderLock { get; private set; }
 
 #pragma warning disable CA1051 // Do not declare visible instance fields
         public struct OnDiskBufferData
@@ -39,47 +41,54 @@ namespace ValveResourceFormat.Blocks
             public readonly bool IsCompressed => DataSize != TotalSize;
             public readonly uint TotalSize => ElementCount * ElementSizeInBytes;
 
-            public void ReadData(BinaryReader reader) => Data ??= ReadFromResourceStream(reader);
+            public void ReadData(BinaryReader reader, Lock readerLock) => Data ??= ReadFromResourceStream(reader, readerLock);
 
-            public readonly byte[] ReadFromResourceStream(BinaryReader reader)
+            public readonly byte[] ReadFromResourceStream(BinaryReader reader, Lock readerLock)
             {
                 var data = new byte[TotalSize];
-                ReadFromResourceStream(reader, data.AsSpan());
+                ReadFromResourceStream(reader, readerLock, data.AsSpan());
                 return data;
             }
 
             /// <summary>
             /// Read the data from the resource binary stream and decompress it if needed.
             /// </summary>
-            public readonly int ReadFromResourceStream(BinaryReader reader, Span<byte> data)
+            public readonly int ReadFromResourceStream(BinaryReader reader, Lock readerLock, Span<byte> data)
             {
-                reader.BaseStream.Position = DataOffset;
-
                 if (!IsCompressed)
                 {
-                    return reader.Read(data);
+                    using (readerLock.EnterScope())
+                    {
+                        reader.BaseStream.Position = DataOffset;
+                        return reader.Read(data);
+                    }
                 }
 
                 var compressedSize = DataSize;
-                var temp = ArrayPool<byte>.Shared.Rent(compressedSize);
+                var compressedBuffer = ArrayPool<byte>.Shared.Rent(compressedSize);
 
                 try
                 {
-                    var compressedBuffer = temp.AsSpan(0, compressedSize);
-                    reader.Read(compressedBuffer);
+                    var compressedSpan = compressedBuffer.AsSpan(0, compressedSize);
+
+                    using (readerLock.EnterScope())
+                    {
+                        reader.BaseStream.Position = DataOffset;
+                        reader.Read(compressedSpan);
+                    }
 
                     if (IsVertex)
                     {
-                        return MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)ElementCount, (int)ElementSizeInBytes, compressedBuffer, data);
+                        return MeshOptimizerVertexDecoder.DecodeVertexBuffer((int)ElementCount, (int)ElementSizeInBytes, compressedSpan, data);
                     }
                     else
                     {
-                        return MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)ElementCount, (int)ElementSizeInBytes, compressedBuffer, data);
+                        return MeshOptimizerIndexDecoder.DecodeIndexBuffer((int)ElementCount, (int)ElementSizeInBytes, compressedSpan, data);
                     }
                 }
                 finally
                 {
-                    ArrayPool<byte>.Shared.Return(temp);
+                    ArrayPool<byte>.Shared.Return(compressedBuffer);
                 }
             }
         }
@@ -122,6 +131,7 @@ namespace ValveResourceFormat.Blocks
         {
             reader.BaseStream.Position = Offset;
             Reader = reader;
+            ReaderLock = resource.ReaderLock;
 
             var vertexBufferOffset = reader.ReadUInt32();
             var vertexBufferCount = reader.ReadUInt32();
@@ -149,12 +159,12 @@ namespace ValveResourceFormat.Blocks
         {
             foreach (var buffer in VertexBuffers)
             {
-                buffer.ReadData(Reader);
+                buffer.ReadData(Reader, ReaderLock);
             }
 
             foreach (var buffer in IndexBuffers)
             {
-                buffer.ReadData(Reader);
+                buffer.ReadData(Reader, ReaderLock);
             }
         }
 

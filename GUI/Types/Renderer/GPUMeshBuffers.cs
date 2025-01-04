@@ -1,6 +1,7 @@
 
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using OpenTK.Graphics.OpenGL;
 using ValveResourceFormat.Blocks;
 
@@ -27,6 +28,8 @@ namespace GUI.Types.Renderer
             var buffers = new byte[bufferCount][];
             var sizes = new uint[bufferCount];
 
+            var decodeTasks = new List<Task>(bufferCount);
+
             try
             {
                 // Read buffers from file if necessary
@@ -44,9 +47,15 @@ namespace GUI.Types.Renderer
                     if (diskBuffer.Data == null)
                     {
                         buffers[i] = rentedArrays[i] = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSize);
-                        diskBuffer.ReadFromResourceStream(vbib.Reader, rentedArrays[i].AsSpan());
+
+                        var arrayCapture = rentedArrays[i];
+                        var decodeTask = Task.Run(() => diskBuffer.ReadFromResourceStream(vbib.Reader, vbib.ReaderLock, arrayCapture.AsSpan()));
+                        decodeTasks.Add(decodeTask);
                     }
                 }
+
+                // Wait for all meshoptimizer decode tasks to finish
+                Task.WaitAll(decodeTasks.ToArray());
 
                 // Load buffers into GPU
                 for (var i = 0; i < bufferCount; i++)
