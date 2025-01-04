@@ -205,9 +205,6 @@ namespace ValveResourceFormat.Blocks
                 })
                 .ToArray();
 
-            reader.BaseStream.Position = buffer.DataOffset;
-            buffer.Data = reader.ReadBytes(buffer.DataSize);
-
             reader.BaseStream.Position = refB + 8; //Go back to the index array to read the next iteration.
 
             return buffer;
