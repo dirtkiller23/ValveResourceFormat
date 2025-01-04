@@ -19,37 +19,45 @@ namespace GUI.Types.Renderer
             GL.CreateBuffers(vbib.VertexBuffers.Count, VertexBuffers);
             GL.CreateBuffers(vbib.IndexBuffers.Count, IndexBuffers);
 
-            var totalCount = vbib.VertexBuffers.Count + vbib.IndexBuffers.Count;
-            var rentedArrays = new byte[totalCount][];
+            var indexBufferStart = vbib.VertexBuffers.Count;
+            var bufferCount = vbib.VertexBuffers.Count + vbib.IndexBuffers.Count;
+
+            var rentedArrays = new byte[bufferCount][];
+            var handles = new int[bufferCount];
+            var buffers = new byte[bufferCount][];
+            var sizes = new uint[bufferCount];
 
             try
             {
                 // Read buffers from file if necessary
-                for (var i = 0; i < totalCount; i++)
+                for (var i = 0; i < bufferCount; i++)
                 {
-                    var buffer = i < vbib.VertexBuffers.Count ? vbib.VertexBuffers[i] : vbib.IndexBuffers[i - vbib.VertexBuffers.Count];
-                    if (buffer.Data == null)
+                    var isVertexBuffer = i < indexBufferStart;
+                    var indexBufferIndex = i - indexBufferStart;
+
+                    handles[i] = isVertexBuffer ? VertexBuffers[i] : IndexBuffers[indexBufferIndex];
+
+                    var diskBuffer = isVertexBuffer ? vbib.VertexBuffers[i] : vbib.IndexBuffers[indexBufferIndex];
+                    sizes[i] = diskBuffer.TotalSize;
+                    buffers[i] = diskBuffer.Data;
+
+                    if (diskBuffer.Data == null)
                     {
-                        rentedArrays[i] = ArrayPool<byte>.Shared.Rent((int)buffer.TotalSize);
-                        buffer.ReadFromResourceStream(vbib.Reader, rentedArrays[i].AsSpan());
+                        buffers[i] = rentedArrays[i] = ArrayPool<byte>.Shared.Rent((int)diskBuffer.TotalSize);
+                        diskBuffer.ReadFromResourceStream(vbib.Reader, rentedArrays[i].AsSpan());
                     }
                 }
 
                 // Load buffers into GPU
-                for (var i = 0; i < vbib.VertexBuffers.Count; i++)
+                for (var i = 0; i < bufferCount; i++)
                 {
-                    LoadGPUBuffer(VertexBuffers[i], vbib.VertexBuffers[i]);
-                }
-
-                for (var i = 0; i < vbib.IndexBuffers.Count; i++)
-                {
-                    LoadGPUBuffer(IndexBuffers[i], vbib.IndexBuffers[i]);
+                    LoadGPUBuffer(handles[i], buffers[i], sizes[i]);
                 }
             }
             finally
             {
                 // Return rented CPU buffers
-                for (var i = 0; i < totalCount; i++)
+                for (var i = 0; i < bufferCount; i++)
                 {
                     if (rentedArrays[i] != null)
                     {
@@ -60,9 +68,9 @@ namespace GUI.Types.Renderer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void LoadGPUBuffer(int gpuBufferHandle, VBIB.OnDiskBufferData buffer)
+        private static void LoadGPUBuffer(int gpuBufferHandle, byte[] buffer, uint size)
         {
-            GL.NamedBufferData(gpuBufferHandle, (IntPtr)buffer.TotalSize, buffer.Data, BufferUsageHint.StaticDraw);
+            GL.NamedBufferData(gpuBufferHandle, (IntPtr)size, buffer, BufferUsageHint.StaticDraw);
         }
     }
 }
