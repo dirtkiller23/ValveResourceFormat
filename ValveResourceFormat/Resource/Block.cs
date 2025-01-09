@@ -27,6 +27,11 @@ namespace ValveResourceFormat
         /// </summary>
         public Resource Resource { get; set; }
 
+        /// <summary>
+        /// Has the block data been read from the resource stream?
+        /// </summary>
+        public bool IsLoaded { get; set; }
+
         public abstract void Read(BinaryReader reader);
 
         [Obsolete("Use Read(BinaryReader) and the Resource property.")]
@@ -34,6 +39,21 @@ namespace ValveResourceFormat
         {
             Resource = resource;
             Read(reader);
+        }
+
+
+        public void Read()
+        {
+            Read(Resource.Reader);
+            IsLoaded = true;
+        }
+
+        public void EnsureLoaded()
+        {
+            if (!IsLoaded)
+            {
+                Read();
+            }
         }
 
         /// <summary>

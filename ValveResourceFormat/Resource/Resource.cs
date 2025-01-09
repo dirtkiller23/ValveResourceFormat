@@ -156,7 +156,7 @@ namespace ValveResourceFormat
         /// </summary>
         /// <param name="input">The input <see cref="Stream"/> to read from.</param>
         /// <param name="verifyFileSize">Whether to verify that the stream was correctly consumed.</param>
-        public void Read(Stream input, bool verifyFileSize = true)
+        public void Read(Stream input, bool verifyFileSize = true, bool readAllBlocks = true)
         {
             Reader = new BinaryReader(input);
 
@@ -272,9 +272,9 @@ namespace ValveResourceFormat
 
             foreach (var block in Blocks)
             {
-                if (block.Type is not BlockType.REDI and not BlockType.RED2 and not BlockType.NTRO)
+                if (readAllBlocks && !block.IsLoaded)
                 {
-                    block.Read(Reader);
+                    block.Read();
                 }
             }
 
@@ -282,6 +282,7 @@ namespace ValveResourceFormat
             {
                 var block = new Sound();
                 block.ConstructFromCtrl(Reader);
+                block.IsLoaded = true;
                 Blocks.Add(block);
             }
 
@@ -317,12 +318,23 @@ namespace ValveResourceFormat
 
         public Block GetBlockByIndex(int index)
         {
-            return Blocks[index];
+            var block = Blocks[index];
+            block.EnsureLoaded();
+            return block;
         }
 
         public Block GetBlockByType(BlockType type)
         {
-            return Blocks.Find(b => b.Type == type);
+            foreach (var block in Blocks)
+            {
+                if (block.Type == type)
+                {
+                    block.EnsureLoaded();
+                    return block;
+                }
+            }
+
+            return null;
         }
 
         public bool ContainsBlockType(BlockType type)
