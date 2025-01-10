@@ -58,7 +58,7 @@ namespace ValveResourceFormat
         /// <summary>
         /// Gets the ResourceEditInfo block.
         /// </summary>
-        public ResourceEditInfo EditInfo { get; private set; }
+        public ResourceEditInfo EditInfo => (ResourceEditInfo)(GetBlockByType(BlockType.RED2) ?? GetBlockByType(BlockType.REDI));
 
         /// <summary>
         /// Gets the ResourceExtRefList block.
@@ -239,12 +239,6 @@ namespace ValveResourceFormat
                 if (block.Type is BlockType.NTRO)
                 {
                     block.Read(Reader);
-                }
-
-                if (block.Type is BlockType.RED2 or BlockType.REDI)
-                {
-                    block.Read(Reader);
-                    EditInfo = (ResourceEditInfo)block;
                 }
 
                 Reader.BaseStream.Position = position + 8;
