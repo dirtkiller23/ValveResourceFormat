@@ -56,6 +56,15 @@ namespace ValveResourceFormat.Compression
                 case 1:
                 case 6:
                     {
+                        var data32 = MemoryMarshal.Read<uint>(data);
+                        data32 &= data32 >> 1;
+
+                        // arrange bits such that low bits of nibbles of data64 contain all 2-bit elements of data32
+                        var data64 = ((ulong)data32 << 30) | (data32 & 0x3fffffff);
+
+                        // adds all 1-bit nibbles together; the sum fits in 4 bits because datacnt=16 would have used mode 3
+                        var datacnt = (int)(((data64 & 0x1111111111111111ul) * 0x1111111111111111ul) >> 60);
+
                         var sel2 = Vector128.Create(MemoryMarshal.Read<uint>(data), 0, 0, 0).AsByte();
                         var rest = Vector128.Create<byte>(data[4..]);
 
@@ -73,11 +82,18 @@ namespace ValveResourceFormat.Compression
 
                         result.CopyTo(destination);
 
-                        return data[(4 + DecodeBytesGroupCount[mask0] + DecodeBytesGroupCount[mask1])..];
+                        return data[(4 + datacnt)..];
                     }
                 case 2:
                 case 7:
                     {
+                        var data64 = MemoryMarshal.Read<ulong>(data);
+                        data64 &= data64 >> 1;
+                        data64 &= data64 >> 2;
+
+                        // adds all 1-bit nibbles together; the sum fits in 4 bits because datacnt=16 would have used mode 3
+                        var datacnt = (int)(((data64 & 0x1111111111111111ul) * 0x1111111111111111ul) >> 60);
+
                         var sel4 = Vector64.Create<byte>(data[..8]).ToVector128();
                         var rest = Vector128.Create<byte>(data[8..]);
 
@@ -94,7 +110,7 @@ namespace ValveResourceFormat.Compression
 
                         result.CopyTo(destination);
 
-                        return data[(8 + DecodeBytesGroupCount[mask0] + DecodeBytesGroupCount[mask1])..];
+                        return data[(8 + datacnt)..];
                     }
                 case 3:
                 case 8:
