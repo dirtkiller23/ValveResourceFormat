@@ -461,7 +461,7 @@ namespace ValveResourceFormat.Compression
 
                     if (useSimd)
                     {
-                        buffer = DecodeVertexBlockSimd(buffer, vertexData, blockSize, vertexSize, lastVertex);
+                        buffer = DecodeVertexBlockSimd(buffer, vertexData, blockSize, vertexSize, lastVertex, channels, version);
                     }
                     else
                     {
