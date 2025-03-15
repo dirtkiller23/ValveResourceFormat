@@ -2,6 +2,7 @@
  * C# Port of https://github.com/zeux/meshoptimizer/blob/master/src/vertexcodec.cpp
  */
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace ValveResourceFormat.Compression
@@ -209,75 +210,16 @@ namespace ValveResourceFormat.Compression
             return data;
         }
 
-        // The original code uses a template for DecodeDeltas1 byte, ushort and uint, but making that work in C# as generic
-        // is a bit of a pain, but probably not impossible. For now we have 3 separate implementations.
-        private static ReadOnlySpan<byte> DecodeDeltas1_1b(ReadOnlySpan<byte> buffer, Span<byte> transposed, int vertexCount, int vertexSize, ReadOnlySpan<byte> lastVertex)
+        private static ReadOnlySpan<byte> DecodeDeltas1(int size, ReadOnlySpan<byte> buffer, Span<byte> transposed, int vertexCount, int vertexSize, ReadOnlySpan<byte> lastVertex, int rot)
         {
-            for (var k = 0; k < 4; k++)
+            for (var k = 0; k < 4; k += size)
             {
                 var vertexOffset = k;
-                var p = lastVertex[0];
 
-                for (var i = 0; i < vertexCount; i++)
-                {
-                    var v = buffer[i];
-                    v = (byte)(Unzigzag8(v) + p);
-                    transposed[vertexOffset] = v;
-                    p = v;
-                    vertexOffset += vertexSize;
-                }
-
-                buffer = buffer[vertexCount..];
-                lastVertex = lastVertex[1..];
-            }
-
-            return buffer;
-        }
-
-        private static ReadOnlySpan<byte> DecodeDeltas1_2b(ReadOnlySpan<byte> buffer, Span<byte> transposed, int vertexCount, int vertexSize, ReadOnlySpan<byte> lastVertex)
-        {
-            for (var k = 0; k < 4; k += sizeof(ushort))
-            {
-                var vertexOffset = k;
-                ushort p = lastVertex[0];
-                for (var j = 1; j < sizeof(ushort); ++j)
-                {
-                    p |= (ushort)(lastVertex[j] << (8 * j));
-                }
-
-                for (var i = 0; i < vertexCount; i++)
-                {
-                    ushort v = buffer[i];
-                    for (var j = 1; j < sizeof(ushort); ++j)
-                    {
-                        v |= (ushort)(buffer[i + vertexCount * j] << (8 * j));
-                    }
-
-                    v = (ushort)(Unzigzag16(v) + p);
-
-                    for (var j = 0; j < sizeof(ushort); ++j)
-                    {
-                        transposed[vertexOffset + j] = (byte)(v >> (j * 8));
-                    }
-
-                    p = v;
-                    vertexOffset += vertexSize;
-                }
-
-                buffer = buffer[(vertexCount * sizeof(ushort))..];
-                lastVertex = lastVertex[sizeof(ushort)..];
-            }
-
-            return buffer;
-        }
-
-        private static ReadOnlySpan<byte> DecodeDeltas1_4b(ReadOnlySpan<byte> buffer, Span<byte> transposed, int vertexCount, int vertexSize, ReadOnlySpan<byte> lastVertex, int rot)
-        {
-            for (var k = 0; k < 4; k += sizeof(uint))
-            {
-                var vertexOffset = k;
+                // Original code is based on a template, so instead of uint here it uses <T>,
+                // but doing generics in C# like this is a pain, so we always just use uint.
                 uint p = lastVertex[0];
-                for (var j = 1; j < sizeof(uint); ++j)
+                for (var j = 1; j < size; ++j)
                 {
                     p |= (uint)(lastVertex[j] << (8 * j));
                 }
@@ -285,14 +227,20 @@ namespace ValveResourceFormat.Compression
                 for (var i = 0; i < vertexCount; i++)
                 {
                     uint v = buffer[i];
-                    for (var j = 1; j < sizeof(uint); ++j)
+                    for (var j = 1; j < size; ++j)
                     {
                         v |= (uint)(buffer[i + vertexCount * j] << (8 * j));
                     }
 
-                    v = Rotate32(v, rot) ^ p;
+                    v = size switch
+                    {
+                        1 => Unzigzag8((byte)v) + p,
+                        2 => Unzigzag16((ushort)v) + p,
+                        4 => Rotate32(v, rot) ^ p,
+                        _ => throw new UnreachableException(),
+                    };
 
-                    for (var j = 0; j < sizeof(uint); ++j)
+                    for (var j = 0; j < size; ++j)
                     {
                         transposed[vertexOffset + j] = (byte)(v >> (j * 8));
                     }
@@ -301,8 +249,8 @@ namespace ValveResourceFormat.Compression
                     vertexOffset += vertexSize;
                 }
 
-                buffer = buffer[(vertexCount * sizeof(uint))..];
-                lastVertex = lastVertex[sizeof(uint)..];
+                buffer = buffer[(vertexCount * size)..];
+                lastVertex = lastVertex[size..];
             }
 
             return buffer;
@@ -364,13 +312,13 @@ namespace ValveResourceFormat.Compression
                     switch (channel & 3)
                     {
                         case 0:
-                            DecodeDeltas1_1b(buffer, transposed[k..], vertexCount, vertexSize, lastVertex[k..]);
+                            DecodeDeltas1(1, buffer, transposed[k..], vertexCount, vertexSize, lastVertex[k..], 0);
                             break;
                         case 1:
-                            DecodeDeltas1_2b(buffer, transposed[k..], vertexCount, vertexSize, lastVertex[k..]);
+                            DecodeDeltas1(2, buffer, transposed[k..], vertexCount, vertexSize, lastVertex[k..], 0);
                             break;
                         case 2:
-                            DecodeDeltas1_4b(buffer, transposed[k..], vertexCount, vertexSize, lastVertex[k..], (32 - (channel >> 4)) & 31);
+                            DecodeDeltas1(4, buffer, transposed[k..], vertexCount, vertexSize, lastVertex[k..], (32 - (channel >> 4)) & 31);
                             break;
                         default:
                             throw new InvalidOperationException("Invalid channel type");
