@@ -3,14 +3,13 @@
  */
 using System.Buffers;
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 
 namespace ValveResourceFormat.Compression
 {
     public static partial class MeshOptimizerVertexDecoder
     {
         private const byte VertexHeader = 0xa0;
+        private const int DecodeVertexVersion = 1;
 
         private const int VertexBlockSizeBytes = 8192;
         private const int VertexBlockMaxSize = 256;
@@ -237,7 +236,7 @@ namespace ValveResourceFormat.Compression
 
             var version = buffer[0] & 0x0F;
 
-            if (version > 0)
+            if (version > DecodeVertexVersion)
             {
                 throw new ArgumentException($"Incorrect vertex buffer encoding version, got {version}.");
             }

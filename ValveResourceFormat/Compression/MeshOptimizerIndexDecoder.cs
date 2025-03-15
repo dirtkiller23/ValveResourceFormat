@@ -3,13 +3,13 @@
  */
 using System.Buffers.Binary;
 using System.IO;
-using ValveResourceFormat.Utils;
 
 namespace ValveResourceFormat.Compression
 {
     public static class MeshOptimizerIndexDecoder
     {
         private const byte IndexHeader = 0xe0;
+        private const int DecodeIndexVersion = 1;
 
         private static void PushEdgeFifo(Span<ValueTuple<uint, uint>> fifo, ref int offset, uint a, uint b)
         {
@@ -103,7 +103,7 @@ namespace ValveResourceFormat.Compression
 
             var version = buffer[0] & 0x0F;
 
-            if (version > 1)
+            if (version > DecodeIndexVersion)
             {
                 throw new ArgumentException($"Incorrect index buffer encoding version, got {version}.");
             }

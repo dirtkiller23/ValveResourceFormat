@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
 using NUnit.Framework;
 using ValveResourceFormat.Compression;
 
@@ -51,6 +50,25 @@ namespace Tests
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
+        private static readonly byte[] kVertexDataV1 = [
+            0xa1, 0xee, 0xaa, 0xee, 0x00, 0x4b, 0x4b, 0x4b, 0x00, 0x00, 0x4b, 0x00, 0x00, 0x7d, 0x7d, 0x7d,
+            0x00, 0x00, 0x7d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x62, 0x00, 0x62,
+        ];
+
+        // This binary blob is a valid v1 encoding of vertex buffer but it used a custom version of
+        // the encoder that exercised all features of the format; because of this it is much larger
+        // and will never be produced by the encoder itself.
+        private static readonly byte[] kVertexDataV1Custom = [
+            0xa1, 0xd4, 0x94, 0xd4, 0x01, 0x0e, 0x00, 0x58, 0x57, 0x58, 0x02, 0x02, 0x12, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x0e, 0x00, 0x7d, 0x7d, 0x7d, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7d, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x62,
+        ];
+
         [Test]
         public void DecodeIndexV0()
         {
@@ -81,6 +99,44 @@ namespace Tests
             }
 
             var decoded = MeshOptimizerVertexDecoder.DecodeVertexBuffer(kVertexBuffer.Length, Marshal.SizeOf<PV>(), kVertexDataV0, useSimd: true);
+            Assert.That(MemoryMarshal.Cast<byte, PV>(decoded).ToArray(), Is.EqualTo(kVertexBuffer));
+        }
+
+        [Test]
+        public void DecodeVertexV1()
+        {
+            var decoded = MeshOptimizerVertexDecoder.DecodeVertexBuffer(kVertexBuffer.Length, Marshal.SizeOf<PV>(), kVertexDataV1, useSimd: false);
+            Assert.That(MemoryMarshal.Cast<byte, PV>(decoded).ToArray(), Is.EqualTo(kVertexBuffer));
+        }
+
+        [Test]
+        public void DecodeVertexV1Simd()
+        {
+            if (!MeshOptimizerVertexDecoder.IsHardwareAccelerated)
+            {
+                Assert.Ignore("Vector128 is not hardware accelerated.");
+            }
+
+            var decoded = MeshOptimizerVertexDecoder.DecodeVertexBuffer(kVertexBuffer.Length, Marshal.SizeOf<PV>(), kVertexDataV1, useSimd: true);
+            Assert.That(MemoryMarshal.Cast<byte, PV>(decoded).ToArray(), Is.EqualTo(kVertexBuffer));
+        }
+
+        [Test]
+        public void DecodeVertexV1Custom()
+        {
+            var decoded = MeshOptimizerVertexDecoder.DecodeVertexBuffer(kVertexBuffer.Length, Marshal.SizeOf<PV>(), kVertexDataV1Custom, useSimd: false);
+            Assert.That(MemoryMarshal.Cast<byte, PV>(decoded).ToArray(), Is.EqualTo(kVertexBuffer));
+        }
+
+        [Test]
+        public void DecodeVertexV1CustomSimd()
+        {
+            if (!MeshOptimizerVertexDecoder.IsHardwareAccelerated)
+            {
+                Assert.Ignore("Vector128 is not hardware accelerated.");
+            }
+
+            var decoded = MeshOptimizerVertexDecoder.DecodeVertexBuffer(kVertexBuffer.Length, Marshal.SizeOf<PV>(), kVertexDataV1Custom, useSimd: true);
             Assert.That(MemoryMarshal.Cast<byte, PV>(decoded).ToArray(), Is.EqualTo(kVertexBuffer));
         }
     }
