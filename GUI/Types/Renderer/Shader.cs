@@ -169,7 +169,7 @@ namespace GUI.Types.Renderer
             }
         }
 
-        public bool SetTexture(int slot, string name, RenderTexture texture)
+        public bool SetTexture(string name, RenderTexture texture)
         {
             var uniformLocation = GetUniformLocation(name);
             if (uniformLocation < 0)
@@ -177,14 +177,20 @@ namespace GUI.Types.Renderer
                 return false;
             }
 
-            SetTexture(slot, uniformLocation, texture);
+            SetTexture(uniformLocation, texture);
             return true;
         }
 
-        public void SetTexture(int slot, int uniformLocation, RenderTexture texture)
+        public void SetTexture(int uniformLocation, RenderTexture texture)
         {
-            GL.BindTextureUnit(slot, texture.Handle);
-            GL.ProgramUniform1(Program, uniformLocation, slot);
+            var handle = GL.Arb.GetTextureHandle(texture.Handle);
+
+            if (!GL.Arb.IsTextureHandleResident(handle))
+            {
+                GL.Arb.MakeTextureHandleResident(handle);
+            }
+
+            GL.Arb.ProgramUniformHandle(Program, uniformLocation, handle);
         }
 
 #if DEBUG

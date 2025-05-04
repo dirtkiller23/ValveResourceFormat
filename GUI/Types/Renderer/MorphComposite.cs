@@ -98,7 +98,7 @@ namespace GUI.Types.Renderer
 
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, frameBuffer);
             GL.UseProgram(shader.Program);
-            shader.SetTexture(0, "morphAtlas", morphAtlas);
+            shader.SetTexture("morphAtlas", morphAtlas);
 
             GL.Viewport(0, 0, 2048, 2048);
             GL.ClearColor(0, 0, 0, 0);

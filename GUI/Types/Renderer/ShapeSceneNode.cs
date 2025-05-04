@@ -282,7 +282,7 @@ namespace GUI.Types.Renderer
 
             if (ToolTexture != null)
             {
-                renderShader.SetTexture(0, "g_tColor", ToolTexture);
+                renderShader.SetTexture("g_tColor", ToolTexture);
             }
 
             GL.BindVertexArray(vaoHandle);

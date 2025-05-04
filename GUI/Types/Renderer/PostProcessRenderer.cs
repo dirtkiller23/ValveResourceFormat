@@ -58,9 +58,9 @@ namespace GUI.Types.Renderer
             GL.UseProgram(shader.Program);
 
             // Bind textures
-            shader.SetTexture(0, "g_tColorBuffer", colorBuffer.Color);
-            shader.SetTexture(1, "g_tColorCorrection", State.ColorCorrectionLUT ?? guiContext.MaterialLoader.GetErrorTexture()); // todo: error postprocess texture
-            shader.SetTexture(2, "g_tBlueNoise", BlueNoise);
+            shader.SetTexture("g_tColorBuffer", colorBuffer.Color);
+            shader.SetTexture("g_tColorCorrection", State.ColorCorrectionLUT ?? guiContext.MaterialLoader.GetErrorTexture()); // todo: error postprocess texture
+            shader.SetTexture("g_tBlueNoise", BlueNoise);
 
             shader.SetUniform1("g_nNumSamplesMSAA", colorBuffer.NumSamples);
             shader.SetUniform1("g_bFlipY", flipY);

@@ -90,21 +90,11 @@ namespace GUI.Types.Renderer
             public Scene.LightProbeType LightProbeType;
         }
 
-        private static readonly Queue<int> instanceBoundTextures = new(capacity: 4);
-
         private static void SetInstanceTexture(Shader shader, ReservedTextureSlots slot, int location, RenderTexture texture)
         {
-            var slotIndex = (int)slot;
-            instanceBoundTextures.Enqueue(slotIndex);
-            shader.SetTexture(slotIndex, location, texture);
-        }
+            Debug.Assert((int)slot > -1); // todo: remove slots
 
-        private static void UnbindInstanceTextures()
-        {
-            while (instanceBoundTextures.TryDequeue(out var slot))
-            {
-                GL.BindTextureUnit(slot, 0);
-            }
+            shader.SetTexture(location, texture);
         }
 
         private static void DrawBatch(List<Request> requests, Scene.RenderContext context)
@@ -184,7 +174,7 @@ namespace GUI.Types.Renderer
 
                         foreach (var (slot, name, texture) in context.View.Textures)
                         {
-                            shader.SetTexture((int)slot, name, texture);
+                            shader.SetTexture(name, texture);
                         }
 
                         context.Scene.LightingInfo.SetLightmapTextures(shader);
@@ -301,8 +291,6 @@ namespace GUI.Types.Renderer
                 request.Call.StartIndex,
                 request.Call.BaseVertex
             );
-
-            UnbindInstanceTextures();
         }
     }
 }

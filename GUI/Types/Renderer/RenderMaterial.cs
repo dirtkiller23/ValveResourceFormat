@@ -27,8 +27,6 @@ namespace GUI.Types.Renderer
 
     class RenderMaterial
     {
-        private const int TextureUnitStart = (int)ReservedTextureSlots.Last + 1;
-
         public int SortId { get; }
         public required Shader Shader { get; init; }
         public Material Material { get; }
@@ -42,7 +40,6 @@ namespace GUI.Types.Renderer
         private readonly bool isMod2x;
         private readonly bool isRenderBackfaces;
         private readonly bool hasDepthBias;
-        private int textureUnit;
 
         [SetsRequiredMembers]
         public RenderMaterial(Material material, VrfGuiContext guiContext, Dictionary<string, byte>? shaderArguments)
@@ -153,8 +150,6 @@ namespace GUI.Types.Renderer
 
         public void Render(Shader? shader = default)
         {
-            textureUnit = TextureUnitStart;
-
             shader ??= Shader;
 
             if (shader.Name == "vrf.picking")
@@ -167,10 +162,7 @@ namespace GUI.Types.Renderer
             {
                 var texture = Textures.GetValueOrDefault(name, defaultTexture);
 
-                if (shader.SetTexture(textureUnit, name, texture))
-                {
-                    textureUnit++;
-                }
+                shader.SetTexture(name, texture);
             }
 
             foreach (var param in shader.Default.Material.IntParams)
@@ -250,11 +242,6 @@ namespace GUI.Types.Renderer
             if (isRenderBackfaces)
             {
                 GL.Enable(EnableCap.CullFace);
-            }
-
-            for (var i = TextureUnitStart; i <= textureUnit; i++)
-            {
-                GL.BindTextureUnit(i, 0);
             }
         }
 
