@@ -107,34 +107,58 @@ uniform float g_flHeightMapZeroPoint1 = 0.5;
 
     uniform float g_flHeightMapScale2 = 1.0;
     uniform float g_flHeightMapZeroPoint2 = 0.5;
+    uniform float g_flBlendSoftness2 = 0.01;
 
     vec2 GetBlendWeights(vec2 heightTex, vec2 heightScale, vec2 heightZero, vec4 vColorBlendValues)
     {
+        float height1_value = heightTex.x;
+        float height2_value = heightTex.y;
         float blendFactor = vColorBlendValues.x;
-        float blendSoftness = vColorBlendValues.w;
+        float blendOffset = vColorBlendValues.w;
 
-        // Weight calculations
-        float h1 = heightScale.x + blendSoftness;
-        float height1 = heightTex.x * h1;
+        // Height map 1 calculations
+        float height1_diff = height1_value - heightZero.x;
+        float height1_scale = heightScale.x + blendOffset;
+        float height1 = height1_diff * height1_scale;
 
-        float h2 = heightScale.y + blendSoftness;
-        float h22 = heightTex.y * (heightScale.y - blendSoftness);
+        // Height map 2 calculations
+        float height2_diff = height2_value - heightZero.y;
+        float height2_pos_scale = heightScale.y - blendOffset;
+        float height2_scale_plus = heightScale.y + blendOffset;
 
-        float blend1 = (-heightZero.x * h1 - ((1.0 - heightZero.y) * h2)) - blendSoftness;
-        float blend2 = (1.0 - heightZero.x) * h1 - ((-heightZero.y) * h2);
+        // First blend calculation
+        float blend_term1 = -heightZero.x * height1_scale;
+        float blend_term2 = (1.0 - heightZero.y) * height2_scale_plus;
+        float blend_path1 = blend_term1 - blend_term2 - blendOffset;
 
-        float h2x = h22 + mix(blend1, blend2, blendFactor);
+        // Second blend calculation
+        float blend_term3 = (1.0 - heightZero.x) * height1_scale;
+        float blend_term4 = -((-heightZero.y) * heightScale.y);
+        float blend_path2 = blend_term3 + blend_term4;
 
-        vec2 weights = vec2(height1, h2x) - vec2(max(height1, h2x) - blendSoftness);
+        // Apply directional blend factor
+        float blendMixed = mix(blend_path1, blend_path2, blendFactor);
+
+        // Calculate final height2
+        float height2 = height2_diff * height2_pos_scale + blendMixed;
+
+        // Create weights vector
+        vec2 weights = vec2(height1, height2);
+
+        // Apply softness according to max height
+        float maxHeight = max(height1, height2);
+        weights = weights - vec2(maxHeight - blendOffset);
 
         // Clamp negative values
         weights = max(weights, vec2(0.0));
 
         // Bias towards material 1
-        weights.x += 0.001;
+        float weight1_biased = weights.x + 0.001;
 
         // Normalize
-        weights = weights / vec2(weights.x + weights.y);
+        float weight_sum = weight1_biased + weights.y;
+        weights.x = weight1_biased / weight_sum;
+        weights.y = weights.y / weight_sum;
 
         return weights;
     }
@@ -163,13 +187,14 @@ uniform float g_flModelTintAmount = 1.0;
 vec3 AdjustBrightnessContrastSaturation(vec3 color, float brightness, float contrast, float saturation)
 {
     // Brightness
-    color = color * RemapVal(brightness, -8.0, 1.0, 0.0, 1.0);
+    color = color * max(0.0, brightness);
 
     // Contrast
-    color = (color - 0.1) * contrast + 0.1;
+    color = mix(vec3(0.5), color, vec3(max(0.0, contrast)));
 
     // Saturation
-    color = mix(GetLuma(color).xxx, color, saturation);
+    float luma = GetLuma(color);
+    color = mix(vec3(luma), color, vec3(max(0.0, saturation)));
 
     return color;
 }
@@ -202,9 +227,10 @@ MaterialProperties_t GetMaterial(vec3 vertexNormals)
 
     #if (F_SHARED_COLOR_OVERLAY == 1)
         vec3 overlay = texture(g_tSharedColorOverlay, vTexCoord.zw).rgb * 2.0 - 1.0;
-        vec3 _15235 = (((vec3(1.0) - pow(vec3(1.0) - max(vec3(0.0), overlay), vec3(g_flOverlayBrightnessContrast))) * g_flOverlayBrightnessContrast)
-            + ((pow(vec3(1.0) + min(vec3(0.0), overlay), vec3(g_flOverlayDarknessContrast)) - vec3(1.0)) * g_flOverlayDarknessContrast)) + vec3(1.0);
-        overlayFactor = max(vec3(0.0), _15235);
+        // Calculate overlay effect with brightness/darkness contrast
+        vec3 brightPart = (vec3(1.0) - pow(vec3(1.0) - max(vec3(0.0), overlay), vec3(g_flOverlayBrightnessContrast))) * g_flOverlayBrightnessContrast;
+        vec3 darkPart = (pow(vec3(1.0) + min(vec3(0.0), overlay), vec3(g_flOverlayDarknessContrast)) - vec3(1.0)) * g_flOverlayDarknessContrast;
+        overlayFactor = max(vec3(0.0), brightPart + darkPart + vec3(1.0));
     #endif
 
     vec3 tintColorNorm = normalize(max(vTintColor_ModelAmount.xyz, vec3(0.001)));
@@ -213,7 +239,7 @@ MaterialProperties_t GetMaterial(vec3 vertexNormals)
     vec3 adjust1 = AdjustBrightnessContrastSaturation(color.rgb, g_fTextureColorBrightness1, g_fTextureColorContrast1, g_fTextureColorSaturation1);
     vec3 color1MaybeAdjusted = mix(color.rgb, adjust1, bvec3(g_nColorCorrectionMode1 == 1));
 
-    vec3 tintAdjusted = mix(color1MaybeAdjusted, adjust1, vec3(tintMask1)).xyz ;
+    vec3 tintAdjusted = mix(color1MaybeAdjusted, adjust1, vec3(tintMask1)).xyz;
     float tintAdjustedLuma = GetLuma(tintAdjusted);
 
     float tintColorAdjustedLumaRatio = tintAdjustedLuma / tintColorNormLuma;
@@ -234,7 +260,6 @@ MaterialProperties_t GetMaterial(vec3 vertexNormals)
     #endif
 
     color.rgb *= g_nVertexColorMode1 == 1 ? vVertexColor_Alpha.rgb : vec3(1.0);
-    color.rgb = (color.rgb);
 
     // Blending
 #if defined(csgo_environment_blend_vfx)
@@ -272,10 +297,6 @@ MaterialProperties_t GetMaterial(vec3 vertexNormals)
     #endif
 
     color2.rgb *= g_nVertexColorMode2 == 1 ? vVertexColor_Alpha.rgb : vec3(1.0);
-    color2.rgb = (color2.rgb);
-
-    height.r -= g_flHeightMapZeroPoint1;
-    height2.r -= g_flHeightMapZeroPoint2;
 
     vec2 weights = GetBlendWeights(
         vec2(height.r, height2.r),
