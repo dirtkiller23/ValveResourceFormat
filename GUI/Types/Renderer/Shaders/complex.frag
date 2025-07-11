@@ -685,7 +685,7 @@ void main()
     outputColor = vec4(mix(vec3(0.5), gammaOutput, vec3(outputColor.a)), outputColor.a);
 #endif
 
-    ApplyFlatOverlayColor(outputColor);
+    ApplyFlatOverlayColor(outputColor, mat);
 
     if (HandleMaterialRenderModes(outputColor, mat))
     {
