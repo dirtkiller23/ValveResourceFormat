@@ -285,6 +285,7 @@ uniform sampler2D g_tTintMask;
 #include "common/fullbright.glsl"
 #include "common/texturing.glsl"
 #include "common/fog.glsl"
+#include "features/flat_overlay_color.glsl"
 
 // Must be last
 #include "common/lighting.glsl"
@@ -683,6 +684,8 @@ void main()
     vec3 gammaOutput = SrgbLinearToGamma(outputColor.rgb);
     outputColor = vec4(mix(vec3(0.5), gammaOutput, vec3(outputColor.a)), outputColor.a);
 #endif
+
+    ApplyFlatOverlayColor(outputColor);
 
     if (HandleMaterialRenderModes(outputColor, mat))
     {

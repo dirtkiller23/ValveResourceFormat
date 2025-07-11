@@ -45,6 +45,8 @@ namespace GUI.Types.Renderer
 
         public Scene Scene { get; }
 
+        public Vector4 SelectedColor = new(0.5f, 0.5f, 0, 0);
+
         public List<SceneEnvMap> EnvMaps { get; set; } = [];
         public int[]? EnvMapIds { get; set; }
         public Vector3? LightingOrigin { get; set; }

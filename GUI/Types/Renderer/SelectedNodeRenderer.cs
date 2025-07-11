@@ -44,15 +44,18 @@ namespace GUI.Types.Renderer
             if (selectedNode >= 0)
             {
                 selectedNodes.RemoveAt(selectedNode);
+                node.SelectedColor.W = 0.5f;
             }
             else
             {
                 selectedNodes.Add(node);
+                node.SelectedColor.W = 0.5f;
             }
         }
 
         public void SelectNode(SceneNode? node, bool forceDisableDepth = false)
         {
+            selectedNodes.ForEach(n => n.SelectedColor.W = 0);
             selectedNodes.Clear();
 
             if (node == null)
@@ -63,6 +66,7 @@ namespace GUI.Types.Renderer
             }
 
             selectedNodes.Add(node);
+            node.SelectedColor.W = 0.5f;
 
             if (forceDisableDepth)
             {

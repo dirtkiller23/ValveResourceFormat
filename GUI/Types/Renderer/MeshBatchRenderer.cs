@@ -70,6 +70,7 @@ namespace GUI.Types.Renderer
             public int Transform = -1;
             public int IsInstancing = -1;
             public int Tint = -1;
+            public int FlatOverlayColor = -1;
             public int ObjectId = -1;
             public int MeshId = -1;
             public int ShaderId = -1;
@@ -140,6 +141,7 @@ namespace GUI.Types.Renderer
                             Transform = shader.GetUniformLocation("transform"),
                             IsInstancing = shader.GetUniformLocation("bIsInstancing"),
                             Tint = shader.GetUniformLocation("vTint"),
+                            FlatOverlayColor = shader.GetUniformLocation("g_vFlatOverlayColor"),
                         };
 
                         if (shader.Parameters.ContainsKey("S_SCENE_CUBEMAP_TYPE"))
@@ -219,6 +221,11 @@ namespace GUI.Types.Renderer
                 GL.ProgramUniform1((uint)shader.Program, uniforms.MeshId, (uint)request.Mesh.MeshIndex);
                 GL.ProgramUniform1((uint)shader.Program, uniforms.ShaderId, (uint)request.Call.Material.Shader.NameHash);
                 GL.ProgramUniform1((uint)shader.Program, uniforms.ShaderProgramId, (uint)request.Call.Material.Shader.Program);
+            }
+
+            if (uniforms.FlatOverlayColor != -1)
+            {
+                GL.ProgramUniform4(shader.Program, uniforms.FlatOverlayColor, request.Node.SelectedColor.X, request.Node.SelectedColor.Y, request.Node.SelectedColor.Z, request.Node.SelectedColor.W);
             }
 
             if (uniforms.CubeMapArrayIndices != -1 && request.Node.EnvMapIds != null)
