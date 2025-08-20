@@ -291,7 +291,7 @@ namespace ValveResourceFormat.ResourceTypes
             writer.Write((int)context.Bytes8.Length / 8);
         }
 
-        private void WriteData(BinaryWriter writer, SerializationContext context)
+        private static void WriteData(BinaryWriter writer, SerializationContext context)
         {
             // We're aligning inside of the compressed data block (even though we don't compress)
             var offset = (int)context.Bytes1.Length;
