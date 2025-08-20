@@ -13,7 +13,7 @@ namespace ValveResourceFormat.ResourceTypes
 
         public KVObject Data { get; private set; }
 
-        private Block BackingData;
+        internal Block BackingData { get; private set; }
 
         public KeyValuesOrNTRO()
         {

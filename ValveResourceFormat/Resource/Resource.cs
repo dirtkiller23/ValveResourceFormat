@@ -46,7 +46,7 @@ namespace ValveResourceFormat
         /// <summary>
         /// Gets the list of blocks this resource contains.
         /// </summary>
-        public List<Block> Blocks { get; }
+        public List<Block> Blocks { get; } = [];
 
         /// <summary>
         /// Gets or sets the type of the resource.
@@ -105,7 +105,16 @@ namespace ValveResourceFormat
         public Resource()
         {
             ResourceType = ResourceType.Unknown;
-            Blocks = [];
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Resource"/> class for creating new resources.
+        /// </summary>
+        public Resource(ResourceType resourceType, ushort version = 0)
+        {
+            ResourceType = resourceType;
+            HeaderVersion = KnownHeaderVersion;
+            Version = version;
         }
 
         /// <summary>
@@ -323,6 +332,96 @@ namespace ValveResourceFormat
 
                 throw new InvalidDataException($"File size ({Reader.BaseStream.Length}) does not match size specified in file ({fullFileSize}) ({ResourceType}).");
             }
+        }
+
+        /// <summary>
+        /// Serialize resource to binary. NOT PRODUCTION READY!
+        /// </summary>
+        /// <param name="stream">Stream to write to.</param>
+        public void Serialize(Stream stream)
+        {
+            if (!stream.CanSeek)
+            {
+                throw new InvalidOperationException("The stream must be seekable.");
+            }
+
+            var start = stream.Position;
+            using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+
+            writer.Write(0xDEADBEEF); // file size to be updated later
+            writer.Write(KnownHeaderVersion);
+            writer.Write(Version);
+            writer.Write(8); // basically always 8 because we only write 2 ints
+            writer.Write(Blocks.Count);
+
+            var blockMetadataOffsets = new List<long>(Blocks.Count); // TODO: This can just be starting offset and then just calculate by block index
+
+            foreach (var block in Blocks)
+            {
+                writer.Write((uint)block.Type);
+                blockMetadataOffsets.Add(stream.Position); // to be updated later
+                writer.Write(0xDEADBEEF); // offset
+                writer.Write(0xDEADBEEF); // size
+            }
+
+            writer.Flush();
+
+            for (var i = 0; i < Blocks.Count; i++)
+            {
+                // TODO: Write byte alignment before each block (i think it's always 8 bytes?)
+
+                var blockOffset = stream.Position;
+                var block = Blocks[i];
+
+                if (block is BinaryKV3 blockKv3)
+                {
+                    // Temporary jank
+                }
+                else if (block is ResourceEditInfo2 blockRedi2)
+                {
+                    blockKv3 = blockRedi2.BackingData;
+                }
+                else if (block is KeyValuesOrNTRO blockNtro && blockNtro.BackingData is BinaryKV3 backingBlockKv3)
+                {
+                    blockKv3 = backingBlockKv3;
+                }
+                else
+                {
+                    throw new NotImplementedException("Serializing is experimental and only supports BinaryKV3 blocks.");
+                }
+
+                blockKv3.Serialize(stream);
+                stream.Flush();
+
+                var blockOffsetEnd = stream.Position;
+                var blockSize = blockOffsetEnd - blockOffset;
+
+                if (blockOffsetEnd > uint.MaxValue)
+                {
+                    throw new InvalidDataException("File size exceeds 32-bit integer.");
+                }
+
+                // Update metadata
+                var blockMetadataOffset = blockMetadataOffsets[i];
+                stream.Position = blockMetadataOffset;
+                writer.Write((uint)(blockOffset - blockMetadataOffset));
+                writer.Write((uint)blockSize);
+                writer.Flush();
+                stream.Position = blockOffsetEnd;
+            }
+
+            var end = stream.Position;
+            stream.Position = start;
+
+            // Update file size
+            var fileSize = end - start;
+
+            if (fileSize > uint.MaxValue)
+            {
+                throw new InvalidDataException("File size exceeds 32-bit integer.");
+            }
+
+            writer.Write((uint)fileSize);
         }
 
         public Block GetBlockByIndex(int index)

@@ -15,7 +15,7 @@ namespace ValveResourceFormat.Blocks
     {
         public override BlockType Type => BlockType.RED2;
 
-        private BinaryKV3 BackingData;
+        internal BinaryKV3 BackingData { get; private set; }
 
         public List<string> WeakReferenceList { get; } = [];
         public Dictionary<string, Dictionary<string, int>> SubassetReferences { get; private set; }
