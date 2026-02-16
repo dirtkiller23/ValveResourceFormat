@@ -69,8 +69,10 @@ public class NmClipExtract
         foreach (var ev in events!)
         {
             var docEventTrack = BuildDocEventBasedOnEventClass(ev, ev.GetStringProperty("_class"));
-            var startTimeSeconds = ev.GetFloatProperty("m_flStartTimeSeconds");
-            var durationSeconds = ev.GetFloatProperty("m_flDurationSeconds");
+            var startTimeObj = ev.GetSubCollection("m_flStartTime");
+            var startTimeSeconds = startTimeObj?.GetFloatProperty("m_flValue") ?? 0f;
+            var durationObj = ev.GetSubCollection("m_flDuration");
+            var durationSeconds = durationObj?.GetFloatProperty("m_flValue") ?? 0f;
             var eventList = docEventTrack!.GetArray<KVObject>("m_events")!.First();
             // Doc file event time stamps are given in frames they can be technically floats, but based on recompilation tests
             // these seem inconsistent, unless they're floored to int, then it matches up.
