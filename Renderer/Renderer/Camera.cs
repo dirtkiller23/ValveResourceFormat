@@ -85,7 +85,11 @@ namespace ValveResourceFormat.Renderer
             AspectRatio = viewportWidth / (float)viewportHeight;
             WindowSize = new Vector2(viewportWidth, viewportHeight);
 
-            // Calculate projection matrix
+            CreateProjectionMatrix();
+        }
+
+        public void CreateProjectionMatrix()
+        {
             ProjectionMatrix = CreatePerspectiveFieldOfView_ReverseZ(GetFOV(), AspectRatio, 1.0f);
         }
 
@@ -210,7 +214,7 @@ namespace ValveResourceFormat.Renderer
 
         private float GetFOV()
         {
-            return MathUtils.ToRadians(RendererContext.FieldOfView);
+            return float.DegreesToRadians(RendererContext.FieldOfView);
         }
     }
 }

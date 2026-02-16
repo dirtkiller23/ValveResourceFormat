@@ -86,30 +86,31 @@ namespace GUI.Types.GLViewers
         {
             Debug.Assert(UiControl != null);
 
-            UiControl.AddCheckBox("Lock Cull Frustum", false, (v) =>
+            using (UiControl.BeginGroup("Debug"))
             {
-                Renderer.LockedCullFrustum = v ? Renderer.Camera.ViewFrustum.Clone() : null;
-            });
-            UiControl.AddCheckBox("Show Static Octree", showStaticOctree, (v) =>
-            {
-                showStaticOctree = v;
-
-                if (showStaticOctree && staticOctreeRenderer != null)
+                UiControl.AddCheckBox("Lock Cull Frustum", false, (v) =>
                 {
-                    using var lockedGl = MakeCurrent();
+                    Renderer.LockedCullFrustum = v ? Renderer.Camera.ViewFrustum.Clone() : null;
+                });
+                UiControl.AddCheckBox("Show Static Octree", showStaticOctree, (v) =>
+                {
+                    showStaticOctree = v;
 
-                    staticOctreeRenderer.StaticBuild();
-                }
-            });
-            UiControl.AddCheckBox("Show Dynamic Octree", showDynamicOctree, (v) => showDynamicOctree = v);
-            UiControl.AddCheckBox("Show Tool Materials", Scene.ShowToolsMaterials, (v) =>
-            {
-                Scene.ShowToolsMaterials = v;
+                    if (showStaticOctree && staticOctreeRenderer != null)
+                    {
+                        using var lockedGl = MakeCurrent();
 
-                SkyboxScene?.ShowToolsMaterials = v;
-            });
+                        staticOctreeRenderer.StaticBuild();
+                    }
+                });
+                UiControl.AddCheckBox("Show Dynamic Octree", showDynamicOctree, (v) => showDynamicOctree = v);
+                UiControl.AddCheckBox("Show Tool Materials", Scene.ShowToolsMaterials, (v) =>
+                {
+                    Scene.ShowToolsMaterials = v;
 
-            AddWireframeToggleControl();
+                    SkyboxScene?.ShowToolsMaterials = v;
+                });
+            }
 
             base.AddUiControls();
         }
@@ -161,8 +162,8 @@ namespace GUI.Types.GLViewers
             sunAngles.X = Math.Clamp(sunAngles.X, 0f, 89f);
             sunAngles.Y %= 360f;
 
-            Scene.LightingInfo.LightingData.LightToWorld[0] = Matrix4x4.CreateRotationY(MathUtils.ToRadians(sunAngles.X))
-                                                             * Matrix4x4.CreateRotationZ(MathUtils.ToRadians(sunAngles.Y));
+            Scene.LightingInfo.LightingData.LightToWorld[0] = Matrix4x4.CreateRotationY(float.DegreesToRadians(sunAngles.X))
+                                                             * Matrix4x4.CreateRotationZ(float.DegreesToRadians(sunAngles.Y));
         }
 
         public virtual void PostSceneLoad()
@@ -295,6 +296,12 @@ namespace GUI.Types.GLViewers
 
             GL.CreateQueries(QueryTarget.TimeElapsed, 1, out frametimeQuery1);
             GL.CreateQueries(QueryTarget.TimeElapsed, 1, out frametimeQuery2);
+
+#if DEBUG
+            const string queryLabel = "Frame Time Query";
+            GL.ObjectLabel(ObjectLabelIdentifier.Query, frametimeQuery1, queryLabel.Length, queryLabel);
+            GL.ObjectLabel(ObjectLabelIdentifier.Query, frametimeQuery2, queryLabel.Length, queryLabel);
+#endif
 
             // Needed to fix crash on certain drivers
             GL.BeginQuery(QueryTarget.TimeElapsed, frametimeQuery2);
@@ -531,7 +538,8 @@ namespace GUI.Types.GLViewers
         {
             Debug.Assert(UiControl != null);
 
-            UiControl.AddDivider();
+            using var _ = UiControl.BeginGroup("Display");
+
             var lightBackgroundCheckbox = UiControl.AddCheckBox("Light Background", ShowLightBackground, (v) =>
             {
                 ShowLightBackground = v;
@@ -545,7 +553,6 @@ namespace GUI.Types.GLViewers
                 ShowSolidBackground = v;
                 Renderer.BaseBackground!.SetSolidBackground(ShowSolidBackground);
             });
-            UiControl.AddDivider();
 
             if (this is not GLMaterialViewer)
             {
